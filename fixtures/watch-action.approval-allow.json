@@ -1,0 +1,8 @@
+{
+  "action": "approval.allow",
+  "approvalId": "approval-uuid",
+  "createdAt": "2026-05-17T12:00:00Z",
+  "kind": "watch.action",
+  "schemaVersion": 1,
+  "sessionId": "session-uuid"
+}

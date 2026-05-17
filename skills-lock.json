@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "watchOS": {
+      "source": "rshankras/claude-code-apple-skills",
+      "sourceType": "github",
+      "skillPath": "skills/watchos/SKILL.md",
+      "computedHash": "6dc2682308a18fb84aea9ee8e595bbe9d60dc19595e4657f3b2feef107aadf73"
+    },
+    "watchos-code-review": {
+      "source": "existential-birds/beagle",
+      "sourceType": "github",
+      "skillPath": "plugins/beagle-ios/skills/watchos-code-review/SKILL.md",
+      "computedHash": "d92b3819bfb6614348cdcb182527e415e99576cf316b3790b3f97d16939a6395"
+    },
+    "watchos-design-guidelines": {
+      "source": "ehmo/platform-design-skills",
+      "sourceType": "github",
+      "skillPath": "skills/watchos/SKILL.md",
+      "computedHash": "1cc331d84dc58e88246cff2082b45f050180bead20d8667ee2bc8644de04103a"
+    }
+  }
+}

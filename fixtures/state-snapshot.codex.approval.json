@@ -1,0 +1,14 @@
+{
+  "activeTool": "codex",
+  "connectionState": "relayConnected",
+  "kind": "state.snapshot",
+  "schemaVersion": 1,
+  "session": {
+    "id": "session-uuid",
+    "sensitivity": "preview",
+    "state": "waitingForApproval",
+    "summary": "Approval required",
+    "title": "Run tests"
+  },
+  "updatedAt": "2026-05-17T12:00:00Z"
+}

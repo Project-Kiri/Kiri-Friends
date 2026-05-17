@@ -1,0 +1,13 @@
+{
+  "createdAt": "2026-05-17T12:00:00Z",
+  "cwd": "/Users/example/project",
+  "event": "approval.requested",
+  "payload": {
+    "summary": "Run tests",
+    "title": "Approve CLI action?",
+    "toolName": "Bash"
+  },
+  "sessionId": "session-uuid",
+  "tool": "codex",
+  "version": 1
+}

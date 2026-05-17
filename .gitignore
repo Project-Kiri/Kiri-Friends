@@ -1,0 +1,49 @@
+.DS_Store
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+.build/
+.swiftpm/
+Package.resolved
+
+# Workspace
+.workspace/
+
+# Local state
+*.xcuserstate
+*.xcuserdata/
+
+# Secrets and credentials
+*.pem
+*.p12
+*.mobileprovision
+.env
+.env.local
+
+# Generated
+*.generated.swift
+node_modules/
+dist/
+coverage/
+
+# Archives
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Playground
+timeline.xctimeline
+playground.xcworkspace
+
+# Temporary
+*.tmp
+*.temp
+*.log
