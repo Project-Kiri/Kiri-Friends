@@ -7,7 +7,7 @@ Kiri Friends moves CLI state from a Mac to an iPhone and Apple Watch through a C
 ```text
 CLI process
   -> CLI plugin or hook
-  -> Mac bridge
+  -> CLI Host Bridge
   -> Cloud Relay
   -> iPhone companion
   -> Apple Watch
@@ -20,7 +20,7 @@ Each boundary can reduce data. Later boundaries should receive less sensitive da
 | Classification | Examples | Allowed Destinations |
 | --- | --- | --- |
 | `none` | Tool ID, state enum, timestamps | All layers |
-| `preview` | Short task summary, sanitized status | Relay, iPhone, Watch app, notifications when enabled |
+| `preview` | Short task summary, sanitized status, coarse health summary labels | Relay, iPhone, Watch app, notifications when enabled |
 | `private` | Full prompt text, full command text, full paths | Mac bridge and iPhone app only when user enables previews |
 | `secret` | Tokens, credentials, env vars, private keys | Must remain on Mac and must not be logged |
 
@@ -80,6 +80,7 @@ Approval requests can affect CLI behavior and require additional safeguards:
 - If the watch path is unavailable, host CLIs should fall back to native approval UI.
 - The Apple Watch should show only a concise summary by default.
 - Full command text should require opening the iPhone companion or enabling explicit previews.
+- HealthKit data must be summarized on device before it leaves the Watch or iPhone. Raw heart-rate samples, detailed HealthKit history, and workout routes must not be sent to the relay for buddy behavior.
 
 ## Watch Face and Always On Redaction
 
@@ -141,6 +142,7 @@ Users should be able to:
 - Disable watch notifications.
 - Disable text previews on Apple Watch.
 - Disable relay sync and use local-only development mode when supported.
+- Disable agent health context without disabling local buddy reactions.
 - Uninstall CLI hooks without destroying unrelated CLI configuration.
 - Rotate or revoke device tokens.
 

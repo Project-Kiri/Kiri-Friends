@@ -1,0 +1,41 @@
+{
+  "activeTool": "codex",
+  "connectionState": "relayConnected",
+  "kind": "state.snapshot",
+  "schemaVersion": 1,
+  "session": {
+    "id": "codex-1",
+    "sensitivity": "preview",
+    "state": "waitingForApproval",
+    "summary": "Approval required",
+    "title": "Run tests",
+    "tool": "codex"
+  },
+  "sessions": [
+    {
+      "id": "codex-1",
+      "sensitivity": "preview",
+      "state": "waitingForApproval",
+      "summary": "Approval required",
+      "title": "Run tests",
+      "tool": "codex"
+    },
+    {
+      "id": "claude-1",
+      "sensitivity": "none",
+      "state": "running",
+      "summary": "Editing docs",
+      "title": "Documentation tour",
+      "tool": "claude-code"
+    },
+    {
+      "id": "copilot-1",
+      "sensitivity": "none",
+      "state": "running",
+      "summary": "Running unit tests",
+      "title": "CI follow-up",
+      "tool": "copilot-cli"
+    }
+  ],
+  "updatedAt": "2026-05-17T12:00:00Z"
+}

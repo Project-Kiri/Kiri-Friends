@@ -1,0 +1,8 @@
+{
+  "activityState" : "focused",
+  "capturedAt" : "2026-05-17T12:00:00Z",
+  "confidence" : 0.72,
+  "energyLevel" : 2,
+  "kind" : "health.signal.summary",
+  "stressLevel" : 1
+}

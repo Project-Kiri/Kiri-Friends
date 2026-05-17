@@ -44,28 +44,67 @@ Payloads should be small. The iPhone companion should summarize and redact relay
 
 ## Latest State Snapshot
 
-Use `updateApplicationContext` for the latest normalized state.
-
-Example payload:
+Use `updateApplicationContext` for the latest normalized state. As of
+the Mac Buddy sync work the application context is a multi-kind
+envelope: each payload sits inside a slot keyed by its
+`WatchPayloadKind` raw value (`state.snapshot`, `buddy.settings`). The
+iPhone companion merges instead of replacing so different kinds do not
+overwrite each other.
 
 ```json
 {
-  "schemaVersion": 1,
-  "kind": "state.snapshot",
-  "updatedAt": "2026-05-17T12:00:00Z",
-  "activeTool": "codex",
-  "connectionState": "relayConnected",
-  "session": {
-    "id": "session-uuid",
-    "state": "waitingForApproval",
-    "title": "Run tests",
-    "summary": "Approval required",
-    "sensitivity": "preview"
+  "state.snapshot": {
+    "schemaVersion": 1,
+    "kind": "state.snapshot",
+    "updatedAt": "2026-05-17T12:00:00Z",
+    "activeTool": "codex",
+    "connectionState": "relayConnected",
+    "session": {
+      "id": "codex-1",
+      "state": "waitingForApproval",
+      "title": "Run tests",
+      "summary": "Approval required",
+      "sensitivity": "preview",
+      "tool": "codex"
+    },
+    "sessions": [
+      {
+        "id": "codex-1",
+        "state": "waitingForApproval",
+        "title": "Run tests",
+        "summary": "Approval required",
+        "sensitivity": "preview",
+        "tool": "codex"
+      },
+      {
+        "id": "claude-1",
+        "state": "running",
+        "title": "Documentation tour",
+        "summary": "Editing docs",
+        "sensitivity": "none",
+        "tool": "claude-code"
+      }
+    ]
+  },
+  "buddy.settings": {
+    "kind": "buddy.settings",
+    "activeManifestId": "com.kirifriends.bufo",
+    "buddyName": "Bufo",
+    "showsPreviewText": false,
+    "sharesAgentHealthContext": false
   }
 }
 ```
 
-The watch should cache this snapshot for offline display.
+Watch-side dispatch lives in `WatchSessionStore.ingest(applicationContext:)`
+which iterates over the envelope slots, decoding each into its concrete
+type. Legacy single-payload contexts (a top-level `kind` field) decode
+through the same path for backwards compatibility.
+
+The watch caches `state.snapshot` for offline display. `buddy.settings`
+controls preview visibility and the active manifest. New CLI tools added
+to `CLITool` decode to `.unknown` when the watch build is older than the
+iPhone build, preventing the snapshot from being dropped.
 
 ## Real-Time Actions
 
@@ -102,6 +141,8 @@ Use `transferUserInfo` for summaries that can arrive later:
 - Recent history entries.
 - Notification follow-up state.
 - Low-priority output previews.
+- Buddy settings and asset sync acknowledgements.
+- Low-sensitivity health summaries when the user opts in to agent context.
 
 Queued updates should include an event ID so the watch can deduplicate.
 
@@ -154,6 +195,9 @@ By default, watch payloads must not include:
 - Environment variables.
 - Tokens.
 - Raw CLI output.
+- Raw heart-rate samples or detailed HealthKit history.
+
+Health summaries sent beyond the iPhone must be derived labels such as `focused`, `active`, or `stressed` with confidence and coarse levels. Raw HealthKit samples stay on device.
 
 ## Testing Checklist
 

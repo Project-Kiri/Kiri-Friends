@@ -6,7 +6,7 @@ The watchOS app uses a tab-based navigation structure optimized for small screen
 
 ```
 ┌─────────────────┐
-│   Status Tab    │  <- Default landing: active CLI, current task
+│   Status Tab    │  <- Default landing: Kiri buddy, active CLI, primary action
 ├─────────────────┤
 │ Commands Tab    │  <- Quick actions: send prompt, stop, restart
 ├─────────────────┤
@@ -37,3 +37,15 @@ Information displayed follows this priority order:
 2. **Active**: Current task, running process, active tool
 3. **Recent**: Last completed task, recent response preview
 4. **Contextual**: Time since last activity, tool version
+
+## Buddy Home
+
+The Status tab is a buddy-first surface. Kiri's visible state is derived from normalized CLI state, approval urgency, connection state, and optional local health summaries:
+
+- `waitingForApproval` maps to an attention state with a visible approve action.
+- `running` maps to focused work.
+- `completed` maps to a brief celebration.
+- `failed` maps to a concerned state.
+- Always On and wrist-down states reduce motion and redact sensitive text.
+
+Custom buddy assets are managed on iPhone and transferred to Watch. The Watch keeps a built-in fallback buddy so the app remains useful if an asset pack is missing or invalid.

@@ -14,3 +14,11 @@ test("loads shared Codex plugin event fixture", async () => {
   assert.equal(event.event, "approval.requested");
   assert.equal(event.sessionId, "session-uuid");
 });
+
+test("loads shared buddy manifest fixture", async () => {
+  const fixturePath = path.resolve("..", "fixtures", "buddy-asset.manifest.json");
+  const manifest = JSON.parse(await readFile(fixturePath, "utf8"));
+
+  assert.equal(manifest.identifier, "com.kirifriends.bufo");
+  assert.ok(manifest.states.attention.length > 0);
+});

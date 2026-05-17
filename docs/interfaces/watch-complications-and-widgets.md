@@ -15,22 +15,32 @@ Smart Stack widgets should start with `accessoryRectangular` because it can show
 
 ## Data Source
 
-Complications and widgets read from a shared App Group store written by the watch app and iPhone companion.
+Complications and widgets read from `AppGroupSnapshotStore` (see
+`apps/apple/Sources/KiriFriendsCore/AppGroupSnapshotStore.swift`)
+backed by the shared App Group `group.com.kirifriends.shared`. The
+iPhone companion's `BridgeRuntime.publishSnapshot()` writes a fresh
+`ComplicationSnapshot` after every meaningful relay event and calls
+`WidgetCenter.shared.reloadAllTimelines()` so the watch picks up the
+update without waiting for the next scheduled refresh.
 
-Data should be a small normalized snapshot:
+Stored shape:
 
 ```json
 {
-  "schemaVersion": 1,
   "updatedAt": "2026-05-17T12:00:00Z",
-  "tool": "codex",
-  "state": "waitingForApproval",
-  "summary": "Approval required",
-  "privacy": "redacted"
+  "shortStatus": "Approval",
+  "detail": "Action needed +2",
+  "symbolName": "hand.tap",
+  "sensitivity": "none"
 }
 ```
 
-The widget extension must not fetch from the Cloud Relay directly.
+The `detail` field carries a `+N` suffix when the Mac Buddy is tracking
+additional sessions beyond the primary one; this lets the complication
+hint at multi-agent activity without listing each session.
+
+The widget extension never talks to the Cloud Relay directly; the
+iPhone companion owns relay auth, polling, and complication writes.
 
 ## Timeline Policy
 
@@ -38,7 +48,10 @@ Widget timelines should prefer predictable refreshes and explicit reloads for hi
 
 Recommended policy:
 
-- Normal idle or running state: refresh every 15 minutes.
+- Normal idle or running state: refresh every 5 minutes; the iPhone
+  companion will trigger an immediate `reloadAllTimelines()` whenever
+  it writes a new snapshot, so this interval mostly covers the case
+  where the companion is suspended.
 - Waiting for approval: reload immediately through local app state and provide a short expiry.
 - Completed task: show completion briefly, then return to idle or last-known state.
 - Offline state: show last updated time.
@@ -99,6 +112,25 @@ Complication views should support:
 - Vibrant.
 
 Use system colors and `widgetAccentable()` for elements that should adopt the watch face accent color.
+
+## Buddy Art on Watch
+
+The Watch app renders the same buddy themes the Mac Buddy uses. Assets
+ship inside `apps/apple/Sources/KiriFriendsWatchKit/Resources/Themes.xcassets/`,
+organised by theme namespace (`clawd`, `calico`, `cloudling`). Each
+imageset wraps a single SVG (clawd, cloudling) or APNG (calico)
+sourced from
+[clawd-on-desk](https://github.com/rullerzhou-afk/clawd-on-desk) and
+redistributed under AGPL-3.0. Selection follows
+`BuddySettings.activeManifestId`. The iPhone companion exposes a picker
+(Settings -> Buddy -> Theme) that writes through
+`BridgeRuntime.publishBuddySettings`. `BundledBuddyThemeRegistry` maps
+the identifier back to a `BundledBuddyTheme` whose `assetName(for:)`
+returns the namespaced Asset Catalog name passed to
+`Image(_:bundle:)`. If a theme is missing an asset for a given
+`BuddyPersonaState`, `BuddyStageView` falls back to an SF Symbol so the
+watch stays glanceable while themes evolve. The Watch and Mac Buddy
+asset copies are kept in sync via `make verify-watch-assets`.
 
 ## Privacy
 

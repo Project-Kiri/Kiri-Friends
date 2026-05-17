@@ -19,7 +19,7 @@ struct KiriFriendsWatchApp: App {
 
 ```swift
 TabView {
-    StatusView()
+    BuddyHomeView()
         .tabItem { Label("Status", systemImage: "waveform") }
     CommandsView()
         .tabItem { Label("Commands", systemImage: "command") }
@@ -30,26 +30,26 @@ TabView {
 }
 ```
 
-## StatusView
+## BuddyHomeView
 
-Displays the active CLI tool, current task, and connection status.
+Displays Kiri's current buddy state, concise speech, current task state, and the primary safe action.
 
 ```swift
-struct StatusView: View {
-    @State private var status: CLIStatus
+struct BuddyHomeView: View {
+    let snapshot: StateSnapshot
+    let sendAction: (WatchAction) -> Void
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
-                StatusHeaderView(status: status)
-                TaskCardView(task: status.currentTask)
-                ConnectionBadgeView(state: status.connectionState)
-            }
-            .padding()
+            BuddyStageView(presentation: BuddyPresentationReducer.presentation(for: snapshot))
+            BuddySpeechBubble(line: presentation.speech)
+            ApprovalActionCard()
         }
     }
 }
 ```
+
+Double tap is reserved for the single visible primary action in the current scene, such as approving a non-private request. Wrist-down Always On state uses `isLuminanceReduced` for redaction and low-motion display; it is not a command input.
 
 ## Complication Views
 
@@ -75,7 +75,9 @@ struct StatusComplication: Widget {
 The iPhone companion app (`KiriFriendsBridge`) provides:
 
 - Cloud Relay connection management
-- Mac bridge pairing status
+- CLI Host Bridge pairing status
 - Full conversation history browsing
 - Notification settings
 - Watch app pairing status
+- Buddy character pack import, validation, preview, and Watch sync
+- Health summary privacy controls

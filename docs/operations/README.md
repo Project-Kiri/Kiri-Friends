@@ -6,6 +6,7 @@ App bundle integration, TestFlight distribution, and release management.
 
 - [local-development.md](local-development.md) — monorepo workspaces, test commands, and end-to-end slice order.
 - [app-store-distribution.md](app-store-distribution.md) — TestFlight beta testing and App Store submission process.
+- [license-boundaries.md](license-boundaries.md) — MIT / AGPL-3.0 split between the watch + iPhone stack and the Mac Buddy.
 
 ## Operations Principles
 

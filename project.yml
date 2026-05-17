@@ -1,0 +1,178 @@
+name: KiriFriends
+
+options:
+  bundleIdPrefix: com.kirifriends
+  developmentLanguage: en
+  deploymentTarget:
+    iOS: "18.0"
+    watchOS: "11.0"
+    macOS: "15.0"
+  generateEmptyDirectories: true
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    GCC_TREAT_WARNINGS_AS_ERRORS: NO
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: NO
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ""
+
+packages:
+  KiriFriendsApple:
+    path: apps/apple
+
+targets:
+  KiriFriendsPhoneApp:
+    type: application
+    platform: iOS
+    deploymentTarget: "18.0"
+    sources:
+      - path: apps/apple/Sources/KiriFriendsPhoneApp
+    info:
+      path: apps/apple/Configuration/KiriFriendsPhoneApp-Info.plist
+      properties:
+        CFBundleDisplayName: Kiri Friends
+        LSRequiresIPhoneOS: true
+        NSHealthShareUsageDescription: Kiri uses coarse wellness summaries to adjust buddy behavior when you allow it.
+        NSHealthUpdateUsageDescription: Kiri does not write health data.
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+    entitlements:
+      path: apps/apple/Configuration/KiriFriendsPhoneApp.entitlements
+    dependencies:
+      - package: KiriFriendsApple
+        product: KiriFriendsCore
+      - package: KiriFriendsApple
+        product: KiriFriendsBridge
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kirifriends.phone
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_FILE: apps/apple/Configuration/KiriFriendsPhoneApp-Info.plist
+        CODE_SIGN_ENTITLEMENTS: apps/apple/Configuration/KiriFriendsPhoneApp.entitlements
+        GENERATE_INFOPLIST_FILE: NO
+
+  KiriFriendsWatchApp:
+    type: application
+    platform: watchOS
+    deploymentTarget: "11.0"
+    sources:
+      - path: apps/apple/Sources/KiriFriendsWatchApp
+    info:
+      path: apps/apple/Configuration/KiriFriendsWatchApp-Info.plist
+      properties:
+        CFBundleDisplayName: Kiri Friends
+        NSHealthShareUsageDescription: Kiri uses coarse wellness summaries to adjust buddy behavior when you allow it.
+        NSHealthUpdateUsageDescription: Kiri does not write health data.
+        WKApplication: true
+        WKWatchOnly: true
+        WKSupportsAlwaysOnDisplay: true
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+    entitlements:
+      path: apps/apple/Configuration/KiriFriendsWatchApp.entitlements
+    dependencies:
+      - package: KiriFriendsApple
+        product: KiriFriendsCore
+      - package: KiriFriendsApple
+        product: KiriFriendsWatchKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kirifriends.watchapp
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_FILE: apps/apple/Configuration/KiriFriendsWatchApp-Info.plist
+        CODE_SIGN_ENTITLEMENTS: apps/apple/Configuration/KiriFriendsWatchApp.entitlements
+        GENERATE_INFOPLIST_FILE: NO
+
+  KiriFriendsBuddyMac:
+    type: application
+    platform: macOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: apps/apple/Sources/KiriFriendsBuddyMac
+    info:
+      path: apps/apple/Configuration/KiriFriendsBuddyMac-Info.plist
+      properties:
+        CFBundleDisplayName: Kiri Buddy
+        LSUIElement: true
+        NSAppleEventsUsageDescription: Kiri Buddy uses Apple Events to focus your CLI terminal window when you tap an action from the buddy.
+        NSAccessibilityUsageDescription: Kiri Buddy uses Accessibility APIs to follow the active terminal and bring it forward when you act on a buddy notification.
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+    entitlements:
+      path: apps/apple/Configuration/KiriFriendsBuddyMac.entitlements
+    dependencies:
+      - package: KiriFriendsApple
+        product: KiriFriendsCore
+      - package: KiriFriendsApple
+        product: KiriFriendsMacBuddyKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kirifriends.buddy.mac
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        INFOPLIST_FILE: apps/apple/Configuration/KiriFriendsBuddyMac-Info.plist
+        CODE_SIGN_ENTITLEMENTS: apps/apple/Configuration/KiriFriendsBuddyMac.entitlements
+        GENERATE_INFOPLIST_FILE: NO
+
+schemes:
+  KiriFriendsPhoneApp:
+    build:
+      targets:
+        KiriFriendsPhoneApp: all
+      parallelizeBuild: true
+      buildImplicitDependencies: true
+    run:
+      executable: KiriFriendsPhoneApp
+      config: Debug
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+
+  KiriFriendsWatchApp:
+    build:
+      targets:
+        KiriFriendsWatchApp: all
+      parallelizeBuild: true
+      buildImplicitDependencies: true
+    run:
+      executable: KiriFriendsWatchApp
+      config: Debug
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release
+
+  KiriFriendsBuddyMac:
+    build:
+      targets:
+        KiriFriendsBuddyMac: all
+      parallelizeBuild: true
+      buildImplicitDependencies: true
+    run:
+      executable: KiriFriendsBuddyMac
+      config: Debug
+    test:
+      config: Debug
+    profile:
+      config: Release
+    analyze:
+      config: Debug
+    archive:
+      config: Release

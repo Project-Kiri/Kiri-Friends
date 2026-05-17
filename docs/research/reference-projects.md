@@ -4,12 +4,19 @@ This document summarizes the reference code under `.workspace/reference/` and re
 
 ## Scope
 
-The current reference workspace contains two relevant projects:
+The current reference workspace contains three relevant projects:
 
 - `.workspace/reference/petdex/`
 - `.workspace/reference/codex-buddy-bridge/`
+- `.workspace/reference/clawd-on-desk/`
 
-The goal is not to copy either project. The goal is to extract proven patterns for CLI hook integration, local bridge behavior, failure handling, and user configuration safety.
+`petdex` and `codex-buddy-bridge` inform the lighter cross-platform
+patterns. `clawd-on-desk` is the primary upstream for the Kiri Buddy for
+macOS port. Code, behaviour, and pixel-art assets sourced from
+`clawd-on-desk` ship under AGPL-3.0 under
+`apps/apple/Sources/KiriFriendsMacBuddyKit/` and
+`apps/apple/Sources/KiriFriendsBuddyMac/` (see
+`docs/operations/license-boundaries.md`).
 
 ## petdex
 
@@ -88,6 +95,82 @@ The approval timeout budget must account for every hop. The Mac bridge should de
 - Do not require the Apple Watch path to be available for a CLI action to continue.
 - Do not block a CLI indefinitely while waiting for a watch response.
 - Do not put private prompt or tool input text on watch faces unless the user explicitly enables previews.
+
+## clawd-on-desk
+
+`clawd-on-desk` is the strongest reference for multi-agent breadth (twelve
+CLIs), a layered permission flow with HTTP fallback, theme-driven
+animation state, and desktop overlay window mechanics. It is the
+upstream for the Mac Buddy port shipped under
+`apps/apple/Sources/KiriFriendsMacBuddyKit/` and
+`apps/apple/Sources/KiriFriendsBuddyMac/`.
+
+Relevant source files:
+
+- `.workspace/reference/clawd-on-desk/src/state.js` — multi-session
+  state machine with priority resolution, one-shot auto-return, and a
+  sleep sequence.
+- `.workspace/reference/clawd-on-desk/src/server.js` plus the
+  `server-route-state.js` / `server-route-permission.js` siblings —
+  HTTP routes for plugin events and blocking permission requests.
+- `.workspace/reference/clawd-on-desk/agents/registry.js` and the
+  per-agent configuration modules — event maps and capability flags
+  for the twelve CLI integrations.
+- `.workspace/reference/clawd-on-desk/src/theme-loader.js`,
+  `theme-schema.js`, and the `themes/clawd|calico|cloudling/` packs —
+  the visual theme system the buddy renders.
+- `.workspace/reference/clawd-on-desk/src/permission.js` — bubble
+  window lifecycle and decision routing.
+
+### Patterns to Adopt
+
+- Resolve display state by priority over the active session set; allow
+  high-priority states (error, notification, sweeping) to dominate
+  even when more sessions are running on lower-priority states.
+- Auto-return one-shot states (attention, error, sweeping,
+  notification, carrying) after their themed display window so the
+  buddy returns to a steady-state visual.
+- Lock the buddy on `notification` while a permission request is
+  pending so the UI cannot drift away from the in-flight approval.
+- Treat theme resources as data; the same state machine drives
+  multiple character themes via `theme.json` schemas.
+- Bind the HTTP listener to loopback only and validate the host header
+  on every request.
+- Default to declining permission requests when the bridge has no UI
+  available (DND, app quitting, bubble dismissed) so the host CLI
+  falls back to its native flow.
+- Ship a doctor command surface that summarises bridge port, session
+  count, DND, and bundled theme count for support diagnostics.
+
+### Patterns to Adapt
+
+- Upstream uses an Electron renderer process for the buddy window with
+  an inline JavaScript eye-tracking module. The Mac Buddy ports the
+  same SVG assets and runs the eye-tracking math inside a `WKWebView`
+  so we can preserve the upstream IDs (`eyes-js`, `body-js`,
+  `shadow-js`) without reauthoring the artwork.
+- Upstream uses Electron `BrowserWindow` collections to stack permission
+  bubbles. The Mac Buddy uses one borderless `NSWindow` per pending
+  request with shared stacking math in
+  `PermissionBubbleWindowController`.
+- Upstream installs hooks via Node scripts under
+  `clawd-on-desk/hooks/`. The Kiri Friends bridge re-implements the
+  lifecycle event vocabulary in TypeScript under `plugins/src/`. Each
+  agent's hook configuration path is documented in
+  `docs/core/cli-plugins.md`; the installer modules are a separate
+  later phase.
+
+### Patterns to Avoid
+
+- Do not assume the Mac Buddy will replicate every theme variant
+  immediately. The buddy must degrade gracefully when a theme is
+  missing one-shot variants (working tiers, mini mode, reactions).
+- Do not invent local-only state that the iPhone or Watch cannot see;
+  every meaningful event must flow through `PluginEventEnvelope` so
+  the relay can fan it out.
+- Do not propagate AGPL outside the Mac Buddy directories. Shared
+  types stay in `KiriFriendsCore` (MIT); Mac Buddy depends on Core,
+  never the reverse.
 
 ## Kiri Friends Implications
 

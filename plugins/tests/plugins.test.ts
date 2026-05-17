@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { claudeContinueOutput, claudeLifecycleEvent } from "../src/claude.js";
+import { CLIHostBridge } from "../src/cli-host-bridge.js";
 import { codexLifecycleEvent, codexPermissionEvent, handleCodexPermissionRequest } from "../src/codex.js";
 import { addJsonHookEntry, removeKiriEntries } from "../src/installer.js";
 import { resolveOpenCodeConfigDir } from "../src/opencode.js";
@@ -118,4 +119,39 @@ test("installer preserves non-Kiri hook entries", () => {
   assert.equal(installed.hooks.PreToolUse[1].hooks[0].marker, undefined);
   assert.equal(parsed.hooks.PreToolUse.length, 1);
   assert.equal(parsed.hooks.PreToolUse[0].hooks[0].command, "echo user");
+});
+
+test("CLI host bridge forwards lifecycle events without a decision", async () => {
+  const seen: string[] = [];
+  const bridge = new CLIHostBridge({
+    relayClient: {
+      async ingestEvent(event) {
+        seen.push(event.event);
+      },
+      async waitForDecision() {
+        throw new Error("non-approval events must not wait");
+      },
+    },
+  });
+
+  const decision = await bridge.handlePluginEvent(codexLifecycleEvent("SessionStart", {}));
+
+  assert.equal(decision, null);
+  assert.deepEqual(seen, ["session.started"]);
+});
+
+test("CLI host bridge waits for approval decisions", async () => {
+  const bridge = new CLIHostBridge({
+    approvalTimeoutMs: 10,
+    relayClient: {
+      async ingestEvent() {},
+      async waitForDecision() {
+        return { decision: "deny", message: "Rejected on Watch" };
+      },
+    },
+  });
+
+  const decision = await bridge.handlePluginEvent(codexPermissionEvent({}));
+
+  assert.deepEqual(decision, { decision: "deny", message: "Rejected on Watch" });
 });

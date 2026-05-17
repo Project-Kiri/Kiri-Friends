@@ -1,16 +1,16 @@
 # Cloud Relay Server
 
-The Cloud Relay server routes Kiri Friends messages between iPhone companions and Mac bridges. It enables remote request delivery when the iPhone and Mac are not on the same local network.
+The Cloud Relay server routes Kiri Friends messages between iPhone companions and CLI Host Bridges. It is the only cross-device message relay and enables remote request delivery without requiring inbound access to a user's computer.
 
 ## Responsibilities
 
 The relay server owns:
 
 - User and device authentication.
-- Device pairing between iPhone companions and Mac bridges.
+- Device pairing between iPhone companions and CLI Host Bridges.
 - Presence for connected devices and active CLI sessions.
-- Uplink event ingestion from Mac bridges.
-- Downlink request delivery to Mac bridges.
+- Uplink event ingestion from CLI Host Bridges.
+- Downlink request delivery to CLI Host Bridges.
 - Queueing while a target device is temporarily offline.
 - Delivery acknowledgement, retry, expiration, and idempotency.
 - Rate limits and payload size limits.
@@ -27,7 +27,7 @@ The relay server does not own:
 
 ### User
 
-A Kiri Friends account. A user can own multiple iPhone companions and Mac bridges.
+A Kiri Friends account. A user can own multiple iPhone companions and CLI Host Bridges.
 
 ### Device
 
@@ -36,25 +36,26 @@ A registered client device.
 Supported device roles:
 
 - `iphone_companion`
-- `mac_bridge`
+- `cli_host_bridge`
+- `mac_bridge` (legacy alias during migration)
 
 The watch is represented through its paired iPhone companion, not as an independent relay client.
 
 ### Pairing
 
-A trust binding between an iPhone companion and a Mac bridge. Pairing should be explicit and revocable.
+A trust binding between an iPhone companion and a CLI Host Bridge. Pairing should be explicit and revocable.
 
 ### Session
 
-A normalized CLI session tracked by the Mac bridge. Sessions can represent Claude Code, Codex, or OpenCode activity.
+A normalized CLI session tracked by the CLI Host Bridge. Sessions can represent Claude Code, Codex, or OpenCode activity.
 
 ### Request
 
-A user-originated action that must be delivered to a Mac bridge. Examples include stop task, approve request, deny request, send quick prompt, and refresh status.
+A user-originated action that must be delivered to a CLI Host Bridge. Examples include stop task, approve request, deny request, send quick prompt, and refresh status.
 
 ### Event
 
-A Mac-originated status update sent to companion devices. Examples include task started, output preview, permission requested, task completed, and bridge offline.
+A CLI-host-originated status update sent to companion devices. Examples include task started, output preview, permission requested, task completed, and bridge offline.
 
 ## Presence Model
 
@@ -74,7 +75,7 @@ Presence is derived from authenticated connections, heartbeats, and recent event
 
 ### Uplink
 
-Mac bridge to relay:
+CLI Host Bridge to relay:
 
 - Lifecycle events.
 - Permission request snapshots.
@@ -96,9 +97,9 @@ iPhone companion to relay:
 - Quick commands.
 - Approval or denial decisions.
 - Refresh requests.
-- Active Mac selection changes.
+- Active CLI Host selection changes.
 
-Relay to Mac bridge:
+Relay to CLI Host Bridge:
 
 - Request envelopes with idempotency keys.
 - Expiration timestamps.
@@ -106,7 +107,7 @@ Relay to Mac bridge:
 
 ## Queueing and Expiration
 
-Downlink requests are queued only when the target Mac bridge is temporarily offline or reconnecting.
+Downlink requests are queued only when the target CLI Host Bridge is temporarily offline or reconnecting.
 
 Default behavior:
 
@@ -131,7 +132,7 @@ Expired requests are not delivered. The relay should emit an expiration event to
 
 ## Delivery Acknowledgement
 
-Requests that affect CLI behavior require acknowledgement from the Mac bridge.
+Requests that affect CLI behavior require acknowledgement from the CLI Host Bridge.
 
 Acknowledgement states:
 
@@ -145,7 +146,7 @@ The relay should distinguish transport delivery from CLI completion. A request c
 
 ## Idempotency
 
-Every mutating request must include an idempotency key. The relay and Mac bridge should deduplicate repeated delivery attempts by `userId`, `targetDeviceId`, and `idempotencyKey`.
+Every mutating request must include an idempotency key. The relay and CLI Host Bridge should deduplicate repeated delivery attempts by `userId`, `targetDeviceId`, and `idempotencyKey`.
 
 Idempotency keys prevent duplicated approvals, repeated prompts, and repeated stop commands after reconnection.
 
@@ -156,7 +157,7 @@ Rate limits protect users and relay infrastructure.
 Recommended initial limits:
 
 - Device registration: low frequency per account and IP.
-- Event ingestion: burst-limited per Mac bridge.
+- Event ingestion: burst-limited per CLI Host Bridge.
 - Downlink requests: strict limits for watch-originated actions.
 - Output previews: size-limited and frequency-limited.
 
@@ -168,9 +169,9 @@ When the iPhone companion is offline:
 
 - The relay can retain recent high-priority Mac events for short replay.
 - Normal output chunks should be dropped or compacted.
-- The Mac bridge should continue local CLI operation.
+- The CLI Host Bridge should continue local CLI operation.
 
-When the Mac bridge is offline:
+When the CLI Host Bridge is offline:
 
 - The iPhone companion shows last-known state.
 - Quick actions are disabled or queued only when safe.

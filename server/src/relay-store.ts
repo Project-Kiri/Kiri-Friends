@@ -10,6 +10,7 @@ import type {
   PairingRecord,
   PresenceRecord,
   PresenceState,
+  RelayEvent,
   RelayRequest,
   RequestStatus,
 } from "./types.js";
@@ -27,6 +28,7 @@ export class RelayStore {
   private readonly pairings = new Map<string, PairingRecord>();
   private readonly presence = new Map<string, PresenceRecord>();
   private readonly requests = new Map<string, RelayRequest>();
+  private readonly events = new Map<string, RelayEvent>();
   private readonly requestByIdempotency = new Map<string, string>();
 
   constructor(options: RelayStoreOptions) {
@@ -43,7 +45,24 @@ export class RelayStore {
     deviceName: string,
     pairingTtlMs = 5 * 60 * 1000,
   ): MacRegistrationResult {
-    const device = this.registerDevice(userId, "mac_bridge", deviceName);
+    return this.registerHostBridge(userId, deviceName, "mac_bridge", pairingTtlMs);
+  }
+
+  registerCLIHostBridge(
+    userId: string,
+    deviceName: string,
+    pairingTtlMs = 5 * 60 * 1000,
+  ): MacRegistrationResult {
+    return this.registerHostBridge(userId, deviceName, "cli_host_bridge", pairingTtlMs);
+  }
+
+  private registerHostBridge(
+    userId: string,
+    deviceName: string,
+    role: DeviceRole,
+    pairingTtlMs: number,
+  ): MacRegistrationResult {
+    const device = this.registerDevice(userId, role, deviceName);
     const pairingCode = this.createPairingCode(userId, device.deviceId, pairingTtlMs);
     const codeRecord = this.pairingCodes.get(pairingCode);
     if (!codeRecord) throw new Error("pairing code was not created");
@@ -111,6 +130,51 @@ export class RelayStore {
 
   getPresence(deviceId: string): PresenceRecord | undefined {
     return this.presence.get(deviceId);
+  }
+
+  ingestEvent(input: {
+    userId: string;
+    sourceDeviceId: string;
+    event: string;
+    sessionId?: string;
+    payload: Record<string, unknown>;
+    sensitivity?: RelayEvent["sensitivity"];
+  }): RelayEvent {
+    const source = this.requireDevice(input.sourceDeviceId);
+    if (source.userId !== input.userId) {
+      throw new Error("event source is not owned by user");
+    }
+    if (source.role !== "mac_bridge" && source.role !== "cli_host_bridge") {
+      throw new Error("only CLI hosts can ingest events");
+    }
+
+    const event: RelayEvent = {
+      eventId: randomUUID(),
+      userId: input.userId,
+      sourceDeviceId: input.sourceDeviceId,
+      event: input.event,
+      createdAt: this.now().toISOString(),
+      payload: input.payload,
+      sensitivity: input.sensitivity ?? "preview",
+    };
+    if (input.sessionId !== undefined) event.sessionId = input.sessionId;
+    this.events.set(event.eventId, event);
+    return event;
+  }
+
+  listEventsForUser(userId: string): RelayEvent[] {
+    return [...this.events.values()]
+      .filter((event) => event.userId === userId)
+      .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
+  }
+
+  listPendingRequests(targetDeviceId: string): RelayRequest[] {
+    const nowMs = this.now().getTime();
+    return [...this.requests.values()]
+      .filter((request) => request.targetDeviceId === targetDeviceId)
+      .filter((request) => request.status === "queued")
+      .filter((request) => Date.parse(request.expiresAt) > nowMs)
+      .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
   }
 
   enqueueRequest(input: {

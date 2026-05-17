@@ -10,7 +10,7 @@ The Apple Watch does not speak CLIBridge directly. Watch-originated actions are 
 | --- | --- |
 | iPhone companion | Converts watch and phone actions into relay requests; receives events for UI, notifications, and WatchConnectivity. |
 | Cloud Relay server | Authenticates devices, routes messages, queues downlinks, and records delivery acknowledgement. |
-| Mac bridge | Maintains local CLI state, ingests plugin events, and executes adapter-specific requests. |
+| CLI Host Bridge | Maintains local CLI state, ingests plugin events, executes adapter-specific requests, and connects outbound to the Cloud Relay. |
 | CLI adapter | Converts normalized Kiri requests into Claude Code, Codex, or OpenCode behavior. |
 
 ## Transport
@@ -18,12 +18,30 @@ The Apple Watch does not speak CLIBridge directly. Watch-originated actions are 
 Supported transports:
 
 - iPhone companion to Cloud Relay: HTTPS plus a streaming channel.
-- Mac bridge to Cloud Relay: outbound HTTPS plus a streaming channel.
-- Local plugin to Mac bridge: Unix domain socket or localhost HTTP.
+- CLI Host Bridge to Cloud Relay: outbound HTTPS plus a streaming channel.
+- Local plugin to CLI Host Bridge: Unix domain socket or localhost HTTP.
 - Development fallback: local TCP socket on `127.0.0.1:7474`.
 - Local Unix socket fallback: `~/.kirifriends/bridge.sock`.
 
-The preferred production path is outbound-only from the Mac bridge to the Cloud Relay. The relay should not require inbound access to a user's Mac.
+### Cloud Relay HTTP Surface
+
+The Cloud Relay server implements a thin HTTP layer over `RelayStore`
+(see `server/src/http-server.ts`). All protected routes expect
+`Authorization: Bearer <deviceToken>` and validate role.
+
+| Route | Method | Caller | Notes |
+| --- | --- | --- | --- |
+| `/healthz` | GET | any | Liveness check (no auth) |
+| `/v1/plugin-events` | POST | Mac Buddy / CLI host bridge | Ingests `PluginEventEnvelope`. Body fields: `event`, `sessionId?`, `payload`. |
+| `/v1/events` | GET | iPhone companion | Lists events for the calling user; supports `since=<eventId>` cursor. |
+| `/v1/requests` | POST | iPhone companion | Enqueues a downlink request for the paired Mac. |
+| `/v1/requests/pending` | GET | Mac Buddy / CLI host bridge | Returns queued requests for the calling device. |
+| `/v1/heartbeat` | POST | any authenticated device | Updates the device's presence record. |
+
+Run the development server with `make dev-relay` (binds `127.0.0.1:8585`
+by default; override with `KIRI_RELAY_HOST` / `KIRI_RELAY_PORT`).
+
+The preferred production path is outbound-only from the CLI Host Bridge to the Cloud Relay. The Cloud Relay is the only cross-device message relay and should not require inbound access to a user's computer.
 
 ## Envelope
 
@@ -42,7 +60,7 @@ All messages use a versioned JSON envelope:
     "deviceId": "device-uuid"
   },
   "target": {
-    "role": "mac_bridge",
+    "role": "cli_host_bridge",
     "deviceId": "device-uuid"
   },
   "payload": {}

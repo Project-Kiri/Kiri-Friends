@@ -8,6 +8,7 @@ watchOS SwiftUI UI, complications, notifications, and iPhone companion surfaces.
 - [watch-connectivity.md](watch-connectivity.md) — iPhone-to-Watch payloads, offline behavior, and action routing.
 - [watch-complications-and-widgets.md](watch-complications-and-widgets.md) — WidgetKit complication and Smart Stack strategy.
 - [watch-notifications.md](watch-notifications.md) — notification categories, actions, haptics, and privacy behavior.
+- [mac-buddy.md](mac-buddy.md) — Mac Buddy SwiftUI app (CLI host bridge + desktop pet, AGPL-3.0).
 
 ## Interface Principles
 

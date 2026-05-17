@@ -8,8 +8,9 @@ Kiri Friends should be tested at protocol boundaries first. The product spans wa
 2. Adapter and plugin contract tests.
 3. Relay API and queue behavior tests.
 4. WatchConnectivity serialization tests.
-5. Focused watchOS UI previews and manual QA.
-6. End-to-end smoke tests with one CLI at a time.
+5. Buddy presentation, asset manifest, and health summary reducer tests.
+6. Focused watchOS UI previews and manual QA.
+7. End-to-end smoke tests with one CLI at a time.
 
 ## Core Tests
 
@@ -25,6 +26,9 @@ Coverage:
 - Sensitivity classification.
 - State transition reducers.
 - Idempotency key behavior.
+- Buddy presentation reducers.
+- Asset manifest validation.
+- Low-sensitivity HealthKit summary classification.
 
 Recommended test style:
 
@@ -89,6 +93,7 @@ Coverage:
 - Queued event deduplication.
 - Offline cache behavior.
 - Redaction rules for watch payloads.
+- Buddy asset transfer metadata validation.
 
 When simulator automation is available, test both iPhone to Watch and Watch to iPhone message paths.
 
@@ -103,17 +108,32 @@ Coverage:
 - Notification action routing.
 - Expired approval action handling.
 - Privacy behavior for Short Look and Long Look content.
+- Health context opt-in behavior separate from local buddy reactions.
 
 ## Manual QA Checklist
 
 ### Watch App
 
 - [ ] App launches without crash.
-- [ ] Status, Commands, History, and Settings tabs are accessible.
+- [ ] Status, Sessions, Commands, and Settings tabs are accessible.
 - [ ] Primary state is understandable within 2 seconds.
 - [ ] Offline state is visible and actions are disabled when needed.
 - [ ] Approval action can be completed from the watch.
 - [ ] Expired approval action fails safely.
+
+### Watch Buddy Art
+
+- [ ] Status tab renders the active theme's buddy art (Clawd pixel
+      crab by default), not an SF Symbol.
+- [ ] Buddy breathes (subtle scale animation) when Reduce Motion is
+      off, and holds still when Reduce Motion is on.
+- [ ] Switching themes on iPhone (Settings → Buddy → Theme) updates
+      the watch within ~1 second over Watch Connectivity.
+- [ ] Watch Settings tab shows the active theme display name.
+- [ ] All four state buckets (idle / running / attention / failed)
+      render a distinct theme asset.
+- [ ] `make verify-watch-assets` passes (Watch and Mac Buddy assets
+      have not drifted).
 
 ### iPhone Companion
 
@@ -156,6 +176,7 @@ make test
 make test-apple
 make test-plugins
 make test-server
+make verify-watch-assets
 ```
 
 Current workspace commands:
@@ -175,4 +196,5 @@ Before a milestone is considered complete:
 - Adapter install and uninstall tests pass.
 - Relay request expiration behavior is tested.
 - Watch privacy checks pass for complications and notifications.
+- Health context opt-in is tested separately from local buddy reactions.
 - Manual QA has been run on paired simulators or real devices.

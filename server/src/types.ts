@@ -1,4 +1,4 @@
-export type DeviceRole = "iphone_companion" | "mac_bridge";
+export type DeviceRole = "iphone_companion" | "cli_host_bridge" | "mac_bridge";
 
 export type PresenceState = "online" | "idle" | "busy" | "waiting" | "offline";
 
@@ -73,6 +73,17 @@ export type RelayRequest = {
   idempotencyKey: string;
   payload: Record<string, unknown>;
   status: RequestStatus;
+};
+
+export type RelayEvent = {
+  eventId: string;
+  userId: string;
+  sourceDeviceId: string;
+  event: string;
+  sessionId?: string;
+  createdAt: string;
+  payload: Record<string, unknown>;
+  sensitivity: "none" | "preview" | "private" | "secret";
 };
 
 export type DeviceRegistrationResult = {

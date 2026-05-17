@@ -51,8 +51,9 @@ Daily actions stay on your wrist. Advanced features remain discoverable through 
 | Native watchOS app | SwiftUI interface built for Apple Watch with complications, notifications, and native controls. |
 | Bidirectional communication | View CLI status on your wrist and send quick commands or prompts back to your tools. |
 | iPhone companion | Bridge app that manages watch sync, notifications, and relay connection state. |
+| Mac Buddy | SwiftUI macOS desktop pet (AGPL-3.0) that ingests CLI hook events, drives an animated overlay, shows approval bubbles, and uplinks to the Cloud Relay. See [docs/interfaces/mac-buddy.md](docs/interfaces/mac-buddy.md). |
 | Cloud Relay | Remote relay for device pairing, presence, request routing, and downlink delivery to the Mac bridge. |
-| Multi-CLI support | Works with Claude Code, OpenCode, and Codex CLI through a unified protocol. |
+| Multi-CLI support | Works with Claude Code, Codex CLI, Copilot CLI, Gemini CLI, Cursor Agent, CodeBuddy, Kiro CLI, Kimi CLI, OpenCode, Pi, OpenClaw, and Hermes Agent through a unified plugin envelope. |
 | Complications | Watch face complications show active CLI status at a glance. |
 | Conversation history | Browse recent CLI interactions and responses directly on your watch. |
 
@@ -138,13 +139,26 @@ fixtures/                  Shared golden JSON contracts
 
 | Command | Description |
 |---------|-------------|
+| `make dev` | Show available dev targets |
+| `make dev-iphone` | Build, install, and launch the iPhone companion in Simulator |
+| `make dev-watch` | Build, install, and launch the Watch app in Watch Simulator |
+| `make dev-mac` | Build and launch the Mac Buddy macOS app |
+| `make dev-relay` | Run the Cloud Relay HTTP server on 127.0.0.1:8585 |
+| `make dev-server` | Start Cloud Relay TypeScript watch mode |
+| `make dev-plugin` | Start CLI plugin TypeScript watch mode |
+| `make generate` | Generate `KiriFriends.xcodeproj` with XcodeGen |
 | `make swift-build` | Build Apple Swift targets |
 | `make run-watch` | Build and run watchOS app on simulator |
 | `make test` | Run Apple, server, and plugin tests |
 | `make test-apple` | Run Swift tests in `apps/apple/` |
+| `make test-mac` | Run Mac Buddy SwiftPM tests |
 | `make test-server` | Run Cloud Relay tests in `server/` |
 | `make test-plugins` | Run CLI plugin tests in `plugins/` |
 | `make clean` | Clean build artifacts |
+
+`make dev-iphone` and `make dev-watch` generate `KiriFriends.xcodeproj` with XcodeGen when needed, then use `xcodebuild` and `simctl` to launch Simulator apps. They require the matching iOS/watchOS Simulator runtimes from Xcode > Settings > Components. SwiftPM executable targets run on macOS and are only used for package-level build and test workflows.
+
+For an end-to-end iPhone session against a real relay, run `make dev-relay` first (binds `127.0.0.1:8585`). The iPhone companion (`BridgeRuntime`) polls `/v1/events`, folds them into a `StateSnapshot`, syncs to the watch via WatchConnectivity, and writes a `ComplicationSnapshot` to the shared App Group `group.com.kirifriends.shared` so the WidgetKit complication updates without restarting Xcode.
 
 ### Agent Contract
 
@@ -173,4 +187,9 @@ See [docs/roadmap/README.md](docs/roadmap/README.md) for the full roadmap.
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+Kiri Friends ships under two licenses:
+
+- **MIT** for the shared domain library `KiriFriendsCore`, the legacy `KiriFriendsCLI` scaffold, the Cloud Relay server, CLI plugins, fixtures, and documentation. See [LICENSE](LICENSE).
+- **AGPL-3.0** for every Apple-platform binary — the watchOS app, iPhone companion, WidgetKit complication, supporting libraries (`KiriFriendsWatchKit`, `KiriFriendsBridge`), the Mac Buddy executable, and its supporting library `KiriFriendsMacBuddyKit`. These bundles carry assets and runtime semantics ported from [Clawd on Desk](https://github.com/rullerzhou-afk/clawd-on-desk). See [NOTICE.md](NOTICE.md) and [docs/operations/license-boundaries.md](docs/operations/license-boundaries.md).
+
+**Distribution is self-build and internal TestFlight only.** Public App Store and external TestFlight are intentionally out of scope under the current license layout; see [docs/operations/app-store-distribution.md](docs/operations/app-store-distribution.md) for the full distribution playbook and the re-licensing path if you want to fork this project for App Store submission.

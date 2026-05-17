@@ -1,4 +1,16 @@
-export type ToolId = "claude-code" | "codex" | "opencode";
+export type ToolId =
+  | "claude-code"
+  | "codex"
+  | "copilot-cli"
+  | "gemini-cli"
+  | "cursor-agent"
+  | "codebuddy"
+  | "kiro-cli"
+  | "kimi-cli"
+  | "opencode"
+  | "pi"
+  | "openclaw"
+  | "hermes";
 
 export type PluginEventKind =
   | "session.started"

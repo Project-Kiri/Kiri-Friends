@@ -1,0 +1,34 @@
+{
+  "author" : "Kiri Friends",
+  "displayName" : "Bufo",
+  "identifier" : "com.kirifriends.bufo",
+  "schemaVersion" : 1,
+  "states" : {
+    "attention" : [
+      "attention.gif"
+    ],
+    "celebrate" : [
+      "celebrate.gif"
+    ],
+    "dizzy" : [
+      "dizzy.gif"
+    ],
+    "failed" : [
+      "failed.gif"
+    ],
+    "heart" : [
+      "heart.gif"
+    ],
+    "idle" : [
+      "idle.gif"
+    ],
+    "running" : [
+      "running.gif"
+    ],
+    "sleep" : [
+      "sleep.gif"
+    ]
+  },
+  "thumbnail" : "thumbnail.png",
+  "version" : "1.0.0"
+}

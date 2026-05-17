@@ -1,13 +1,13 @@
 # CLI Plugin and Hook Contracts
 
-Kiri Friends integrates with Claude Code, Codex, and OpenCode through small local plugins or hooks. These integrations are the first hop between a host CLI and the Mac bridge.
+Kiri Friends integrates with twelve CLI hosts through small local plugins or hooks: Claude Code, Codex CLI, Copilot CLI, Gemini CLI, Cursor Agent, CodeBuddy, Kiro CLI, Kimi Code CLI, OpenCode, Pi, OpenClaw, and Hermes Agent. These integrations are the first hop between a host CLI and the Mac bridge.
 
 ## Boundary
 
 Plugins and hooks:
 
 - Collect host CLI lifecycle events.
-- Forward normalized event envelopes to the Mac bridge.
+- Forward normalized event envelopes to the CLI Host Bridge.
 - Return host-specific decisions when the host CLI requires a response.
 - Fail quickly and let the host CLI continue with native behavior.
 
@@ -26,7 +26,7 @@ Preferred local transports:
 1. Unix domain socket at `~/.kirifriends/bridge.sock`.
 2. Localhost HTTP on `127.0.0.1` for tools that cannot use Unix sockets.
 
-The Mac bridge owns both endpoints. Plugins should use short client timeouts and never assume the bridge is running.
+The CLI Host Bridge owns both endpoints. Plugins should use short client timeouts and never assume the bridge is running. The Cloud Relay Server is the only cross-device message relay; plugins never talk to it directly.
 
 ## Common Plugin Event Envelope
 
@@ -139,6 +139,76 @@ OpenCode configuration paths should respect:
 
 The plugin should be installed into the user's OpenCode plugin directory and removed cleanly on uninstall.
 
+## Extended Agent Roster
+
+The remaining nine agents shipped with the Mac Buddy port follow the same plugin envelope. Their hook event vocabularies are documented inline; the canonical Swift mapping lives in `apps/apple/Sources/KiriFriendsMacBuddyKit/Agents/AgentRegistry.swift` and the TypeScript hook mappers live in `plugins/src/<agent>.ts`.
+
+### Copilot CLI
+
+| Copilot Hook | Kiri Event |
+| --- | --- |
+| `sessionStart` | `session.started` |
+| `userPromptSubmitted` | `prompt.submitted` |
+| `preToolUse` | `tool.started` |
+| `postToolUse` | `tool.completed` |
+| `errorOccurred` | `session.failed` |
+| `agentStop` | `session.completed` |
+| `subagentStart` | `tool.started` |
+| `subagentStop` | `subagent.completed` |
+| `preCompact` | `session.compacting` |
+
+Hook configuration lives at `~/.copilot/hooks/hooks.json` and is the only integration that does not auto-register on bridge launch (the user must opt-in once).
+
+### Gemini CLI
+
+| Gemini Hook | Kiri Event |
+| --- | --- |
+| `SessionStart` | `session.started` |
+| `BeforeAgent` | `prompt.submitted` |
+| `BeforeTool` / `AfterTool` | `tool.started` / `tool.completed` |
+| `AfterAgent` | `session.completed` |
+| `Notification` | `session.waiting` |
+| `PreCompress` | `session.compacting` |
+
+Hook configuration lives at `~/.gemini/settings.json`.
+
+### Cursor Agent
+
+| Cursor Hook | Kiri Event |
+| --- | --- |
+| `beforeSubmitPrompt` | `prompt.submitted` |
+| `preToolUse` / `postToolUse` | `tool.started` / `tool.completed` |
+| `stop` | `session.completed` |
+| `subagentStart` / `subagentStop` | `tool.started` / `subagent.completed` |
+| `preCompact` | `session.compacting` |
+| `afterAgentThought` | `prompt.submitted` |
+
+Hook configuration lives at `~/.cursor/hooks.json`.
+
+### CodeBuddy
+
+CodeBuddy hooks reuse the Claude Code PascalCase vocabulary verbatim. Configuration lives at `~/.codebuddy/settings.json`. The Mac bridge accepts the same hook payload shape as Claude Code; the only routing difference is `agent_id=codebuddy`.
+
+### Kiro CLI
+
+Kiro lacks global hooks. The installer must inject per-agent hook entries into each agent JSON under `~/.kiro/agents/`. The Mac bridge tracks Kiro sessions by cwd because Kiro reuses `sessionId="default"`.
+
+### Kimi Code CLI
+
+Kimi hooks live in `~/.kimi/config.toml` under `[[hooks]]` entries. The hook vocabulary mirrors Claude Code's PascalCase set.
+
+### Pi
+
+Pi exposes lifecycle events through a global extension under `~/.pi/agent/extensions/clawd-on-desk`. The Mac bridge accepts the same envelope; the agent identifier is `pi`. Permission bubbles are supported for `bash`, `write`, and `edit` tool calls.
+
+### OpenClaw
+
+OpenClaw plugin events land via `~/.openclaw/openclaw.json` plugin configuration. State events are supported; permission bubbles are not yet supported by upstream OpenClaw.
+
+### Hermes Agent
+
+Hermes plugin events arrive from a Python plugin installed under Hermes' managed plugin directory. The hook surface is the smallest of the roster (lifecycle + tool failure). Permission bubbles are not supported.
+
 ## Command Downlink
 
 Some host CLIs may support commands initiated from Kiri Friends.
@@ -174,8 +244,8 @@ Uninstallers must:
 
 | Failure | Expected Behavior |
 | --- | --- |
-| Mac bridge not running | Plugin exits quickly; host CLI continues. |
-| Cloud Relay unavailable | Mac bridge records local state; permission hooks fall back when needed. |
+| CLI Host Bridge not running | Plugin exits quickly; host CLI continues. |
+| Cloud Relay unavailable | CLI Host Bridge records local state; permission hooks fall back when needed. |
 | iPhone offline | Relay queues safe requests or expires action requests. |
 | Watch unavailable | iPhone shows state; permission hooks fall back before host timeout. |
 | Invalid plugin payload | Plugin logs diagnostics and avoids mutating CLI behavior. |
