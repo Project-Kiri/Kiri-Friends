@@ -54,6 +54,7 @@ public enum BuddyPresentationReducer {
         isLuminanceReduced: Bool
     ) -> BuddyPersonaState {
         if isLuminanceReduced { return .sleep }
+        if snapshot.approval != nil { return .attention }
 
         switch snapshot.session?.state {
         case .waitingForApproval:
@@ -96,30 +97,10 @@ public enum BuddyPresentationReducer {
             return BuddySpeechLine(text: "Resting nearby.", sensitivity: .none)
         }
 
-        if let approval = snapshot.approval {
-            return BuddySpeechLine(text: approval.summary, sensitivity: approval.sensitivity)
-        }
-
-        if let session = snapshot.session {
-            return BuddySpeechLine(text: session.summary, sensitivity: session.sensitivity)
-        }
-
-        switch state {
-        case .sleep:
-            return BuddySpeechLine(text: "Waiting for your iPhone.", sensitivity: .none)
-        case .idle:
-            return BuddySpeechLine(text: "Ready when you are.", sensitivity: .none)
-        case .running:
-            return BuddySpeechLine(text: "Kiri is working.", sensitivity: .none)
-        case .attention:
-            return BuddySpeechLine(text: "Action needed.", sensitivity: .none)
-        case .celebrate:
-            return BuddySpeechLine(text: "Task complete.", sensitivity: .none)
-        case .dizzy, .failed:
-            return BuddySpeechLine(text: "Something needs attention.", sensitivity: .none)
-        case .heart:
-            return BuddySpeechLine(text: "Waiting for your reply.", sensitivity: .none)
-        }
+        // CLI summaries are task context, not words spoken by the buddy. Keep
+        // them in approval sheets, session rows, and complications instead of
+        // rendering them as pet speech.
+        return BuddySpeechLine(text: "", sensitivity: .none)
     }
 
     private static func primaryAction(for snapshot: StateSnapshot) -> WatchActionKind? {

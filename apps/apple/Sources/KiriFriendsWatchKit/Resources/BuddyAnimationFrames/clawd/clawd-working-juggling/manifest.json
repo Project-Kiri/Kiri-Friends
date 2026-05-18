@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "theme": "clawd",
+  "sourceFile": "clawd-working-juggling.svg",
+  "sourceSha256": "2133d8830a2e750821cd97e34d5055db867681c286ae4341c02b130fcdcee308",
+  "durationMs": 4000,
+  "frameSize": 192,
+  "frames": [
+    "frame-000.png",
+    "frame-001.png",
+    "frame-002.png",
+    "frame-003.png",
+    "frame-004.png",
+    "frame-005.png",
+    "frame-006.png",
+    "frame-007.png",
+    "frame-008.png",
+    "frame-009.png",
+    "frame-010.png",
+    "frame-011.png",
+    "frame-012.png",
+    "frame-013.png",
+    "frame-014.png",
+    "frame-015.png"
+  ],
+  "posterFrame": "frame-000.png",
+  "layout": {
+    "viewBox": {
+      "x": -15,
+      "y": -25,
+      "width": 45,
+      "height": 45
+    },
+    "contentBox": {
+      "x": -4,
+      "y": -3,
+      "width": 23,
+      "height": 20
+    },
+    "centerX": 7.5,
+    "baselineY": 17,
+    "visibleHeightRatio": 0.58,
+    "baselineBottomRatio": 0.05
+  }
+}

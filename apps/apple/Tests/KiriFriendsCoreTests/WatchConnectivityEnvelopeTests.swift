@@ -145,6 +145,32 @@ struct WatchSessionStoreDispatchTests {
         #expect(store.snapshot == snapshot)
         #expect(store.buddySettings == nil)
     }
+
+    @Test("Approval decision clears pending state locally")
+    func approvalDecisionClearsPendingStateLocally() {
+        let suite = "kiri-watch-dispatch-approval-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let cache = WatchStateCache(defaults: defaults, key: "snapshot")
+        let store = WatchSessionStore(cache: cache)
+        store.ingest(applicationContext: (try? WatchConnectivityPayload.dictionary(from: StateSnapshot.placeholder)) ?? [:])
+
+        store.applyOptimisticDecision(
+            for: WatchAction(
+                action: .approvalAllow,
+                sessionId: "session-uuid",
+                approvalId: "approval-uuid",
+                createdAt: Date(timeIntervalSince1970: 1_779_020_413)
+            )
+        )
+
+        #expect(store.snapshot.approval == nil)
+        #expect(store.snapshot.session?.state == .running)
+        #expect(store.snapshot.session?.title == "")
+        #expect(store.snapshot.session?.summary == "")
+        #expect(BuddyPresentationReducer.presentation(for: store.snapshot).speech.text == "")
+    }
 }
 
 #if canImport(WatchKit)

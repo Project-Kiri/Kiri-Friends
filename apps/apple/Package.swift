@@ -64,7 +64,10 @@ let package = Package(
                 // Stored as an Asset Catalog so the iOS / watchOS asset
                 // compiler renders the SVGs natively (UIImage cannot
                 // decode raw SVG files; the compiler can).
-                .process("Resources/Themes.xcassets")
+                .process("Resources/Themes.xcassets"),
+                // Pre-rendered frame sequences generated from the canonical
+                // Mac Buddy SVG animations for watchOS playback.
+                .copy("Resources/BuddyAnimationFrames")
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6)

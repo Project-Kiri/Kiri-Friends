@@ -60,6 +60,11 @@ public struct PendingWatchActionOption: Hashable, Identifiable, Sendable {
     }
 }
 
+public enum PendingActionLayout: Sendable {
+    case horizontal
+    case vertical
+}
+
 public enum WristTurnDirection: Hashable, Sendable {
     case previous
     case next
@@ -175,6 +180,7 @@ public final class WristOptionSelector {
 
 public struct PendingActionStrip: View {
     private let options: [PendingWatchActionOption]
+    private let layout: PendingActionLayout
     private let sendAction: (WatchActionKind) -> Void
 
     @State private var selectedActionID: WatchActionKind?
@@ -182,17 +188,30 @@ public struct PendingActionStrip: View {
 
     public init(
         options: [PendingWatchActionOption],
+        layout: PendingActionLayout = .horizontal,
         sendAction: @escaping (WatchActionKind) -> Void
     ) {
         self.options = options
+        self.layout = layout
         self.sendAction = sendAction
     }
 
     public var body: some View {
         if !options.isEmpty {
-            HStack(spacing: 6) {
-                ForEach(options) { option in
-                    actionButton(for: option)
+            Group {
+                switch layout {
+                case .horizontal:
+                    HStack(spacing: 6) {
+                        ForEach(options) { option in
+                            actionButton(for: option)
+                        }
+                    }
+                case .vertical:
+                    VStack(spacing: 10) {
+                        ForEach(options) { option in
+                            actionButton(for: option)
+                        }
+                    }
                 }
             }
             .onAppear(perform: refreshSelectionAndMotion)
@@ -208,26 +227,47 @@ public struct PendingActionStrip: View {
         if option.action == currentSelection {
             baseButton(for: option)
                 .buttonStyle(.borderedProminent)
+                .tint(option.isDestructive ? .red : .green)
                 .accessibilityValue("Highlighted")
         } else {
             baseButton(for: option)
                 .buttonStyle(.bordered)
+                .tint(.secondary)
                 .opacity(0.72)
         }
     }
 
     private func baseButton(for option: PendingWatchActionOption) -> some View {
         Button(role: option.isDestructive ? .destructive : nil) {
-            submit(option)
+            handleTap(option)
         } label: {
             Text(option.title)
-                .font(.caption.weight(.semibold))
+                .font(buttonFont)
                 .lineLimit(1)
-                .frame(maxWidth: .infinity)
+                .frame(maxWidth: .infinity, minHeight: minimumButtonHeight)
         }
-        .tint(option.isDestructive ? .red : nil)
+        .controlSize(layout == .vertical ? .large : .regular)
+        .buttonBorderShape(.capsule)
         .primaryHandGesture(isEnabled: option.action == currentSelection)
-        .accessibilityHint("\(option.accessibilityHint) Turn your wrist to change the highlighted option. Double tap to choose it.")
+        .accessibilityHint("\(option.accessibilityHint) Turn your wrist or tap once to highlight another option. Tap the highlighted option again to choose it.")
+    }
+
+    private var buttonFont: Font {
+        switch layout {
+        case .horizontal:
+            return .caption.weight(.semibold)
+        case .vertical:
+            return .title3.weight(.semibold)
+        }
+    }
+
+    private var minimumButtonHeight: CGFloat? {
+        switch layout {
+        case .horizontal:
+            return nil
+        case .vertical:
+            return 48
+        }
     }
 
     private var currentSelection: WatchActionKind? {
@@ -237,7 +277,13 @@ public struct PendingActionStrip: View {
         return options.first?.action
     }
 
-    private func submit(_ option: PendingWatchActionOption) {
+    private func handleTap(_ option: PendingWatchActionOption) {
+        if options.count > 1, option.action != currentSelection {
+            selectedActionID = option.action
+            KiriHaptics.selectionChanged()
+            return
+        }
+
         selectedActionID = option.action
         sendAction(option.action)
     }

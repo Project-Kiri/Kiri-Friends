@@ -4,19 +4,16 @@ import SwiftUI
 public struct BuddyHomeView: View {
     private let snapshot: StateSnapshot
     private let theme: BundledBuddyTheme
-    private let sendAction: (WatchAction) -> Void
 
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
         snapshot: StateSnapshot,
-        theme: BundledBuddyTheme = BundledBuddyThemeRegistry.defaultTheme,
-        sendAction: @escaping (WatchAction) -> Void
+        theme: BundledBuddyTheme = BundledBuddyThemeRegistry.defaultTheme
     ) {
         self.snapshot = snapshot
         self.theme = theme
-        self.sendAction = sendAction
     }
 
     public var body: some View {
@@ -24,73 +21,60 @@ public struct BuddyHomeView: View {
             for: snapshot,
             isLuminanceReduced: isLuminanceReduced
         )
-        let pendingOptions = PendingWatchActionOption.options(for: snapshot)
 
         // Keep the layout glanceable per watchos-design-guidelines W-GL-01:
-        // buddy art, one summary line, and the primary action must fit the
-        // first screen. ScrollView remains so accessibility text sizes can
-        // still grow without clipping the action.
-        ScrollView {
-            VStack(spacing: 4) {
-                BuddyStageView(
-                    presentation: presentation,
-                    theme: theme,
-                    reduceMotion: reduceMotion,
-                    stageSize: pendingOptions.isEmpty ? 132 : 112
-                )
-                BuddySpeechBubble(line: presentation.speech, redactsText: isLuminanceReduced)
-                ConnectionBadgeView(connectionState: snapshot.connectionState)
-
-                PendingActionStrip(options: pendingOptions) { action in
-                    playHaptic(for: action)
-                    sendAction(makeAction(action))
-                }
-                .accessibilityHidden(presentation.primaryAction == nil)
-            }
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .offset(y: pendingOptions.isEmpty ? 0 : -26)
+        // buddy art and one summary line fit the first screen without
+        // becoming a scroll container. Approval actions appear in the
+        // foreground prompt owned by the Watch app.
+        VStack(spacing: 6) {
+            Spacer(minLength: 0)
+            BuddyStageView(
+                snapshot: snapshot,
+                presentation: presentation,
+                theme: theme,
+                reduceMotion: reduceMotion,
+                isLuminanceReduced: isLuminanceReduced,
+                stageSize: 132
+            )
+            BuddySpeechBubble(line: presentation.speech, redactsText: isLuminanceReduced)
+            ConnectionBadgeView(connectionState: snapshot.connectionState)
+            Spacer(minLength: 0)
         }
+        .offset(y: stageVisualLift)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 10)
     }
 
-    private func makeAction(_ action: WatchActionKind) -> WatchAction {
-        WatchAction(
-            action: action,
-            sessionId: snapshot.session?.id ?? snapshot.approval?.sessionId,
-            approvalId: snapshot.approval?.id,
-            createdAt: .now
-        )
-    }
-
-    private func playHaptic(for action: WatchActionKind) {
-        switch action {
-        case .approvalAllow:
-            KiriHaptics.approvalAccepted()
-        case .approvalDeny:
-            KiriHaptics.approvalDenied()
-        case .taskStop, .promptSendQuick, .statusRefresh:
-            KiriHaptics.selectionChanged()
-        }
+    private var stageVisualLift: CGFloat {
+        // The desktop buddy sprites include top-heavy transparent padding.
+        // Lifting the compact Watch stack centers the visible pet, not the
+        // source asset canvas plus caption.
+        -26
     }
 }
 
 public struct BuddyStageView: View {
+    let snapshot: StateSnapshot
     let presentation: BuddyPresentation
     let theme: BundledBuddyTheme
     let reduceMotion: Bool
+    let isLuminanceReduced: Bool
     let stageSize: CGFloat
 
-    @State private var isBreathing = false
-
     public init(
+        snapshot: StateSnapshot,
         presentation: BuddyPresentation,
         theme: BundledBuddyTheme = BundledBuddyThemeRegistry.defaultTheme,
         reduceMotion: Bool = false,
+        isLuminanceReduced: Bool = false,
         stageSize: CGFloat = 104
     ) {
+        self.snapshot = snapshot
         self.presentation = presentation
         self.theme = theme
         self.reduceMotion = reduceMotion
+        self.isLuminanceReduced = isLuminanceReduced
         self.stageSize = stageSize
     }
 
@@ -99,60 +83,20 @@ public struct BuddyStageView: View {
         // we deliberately omit the raw "Attention/Running/..." caption per
         // watchos-design-guidelines W-GL-04 and the project copy rule about
         // redundant text. VoiceOver still announces the state.
-        stageImage
-            .frame(width: stageSize, height: stageSize)
-            .scaleEffect(reduceMotion ? 1 : (isBreathing ? scale : 1.0))
-            .animation(
-                reduceMotion
-                    ? nil
-                    : .easeInOut(duration: 1.6).repeatForever(autoreverses: true),
-                value: isBreathing
-            )
-            .onAppear { isBreathing = true }
+        BuddyAnimationPlayer(
+            request: BuddyAnimationResolver.request(
+                for: snapshot,
+                presentation: presentation,
+                theme: theme,
+                isLuminanceReduced: isLuminanceReduced
+            ),
+            fallbackAssetName: BuddyStageAssetResolver.assetName(for: presentation.state, in: theme),
+            fallbackSymbolName: BuddyStageAssetResolver.symbolFallback(for: presentation.state),
+            reduceMotion: reduceMotion,
+            stageSize: stageSize
+        )
             .accessibilityElement()
             .accessibilityLabel("Kiri is \(presentation.state.rawValue)")
-    }
-
-    @ViewBuilder
-    private var stageImage: some View {
-        if let assetName = BuddyStageAssetResolver.assetName(
-            for: presentation.state,
-            in: theme
-        ) {
-            Image(assetName, bundle: .module)
-                .resizable()
-                .interpolation(.none)
-                .aspectRatio(contentMode: .fit)
-                // The imported desktop sprites carry substantial transparent
-                // padding; zoom them in so the character is the primary Watch
-                // visual instead of a small icon inside the asset canvas.
-                .scaleEffect(assetZoom)
-        } else {
-            Image(systemName: BuddyStageAssetResolver.symbolFallback(for: presentation.state))
-                .font(.system(size: stageSize * 0.68))
-        }
-    }
-
-    private var scale: CGFloat {
-        switch presentation.state {
-        case .running:
-            return 1.08
-        case .attention, .celebrate, .failed:
-            return 1.04
-        default:
-            return 1.02
-        }
-    }
-
-    private var assetZoom: CGFloat {
-        switch theme.namespace {
-        case "clawd":
-            return 1.42
-        case "cloudling":
-            return 1.15
-        default:
-            return 1.25
-        }
     }
 }
 
@@ -196,14 +140,17 @@ public struct BuddySpeechBubble: View {
     }
 
     public var body: some View {
-        Text(redactsText ? "Kiri is nearby." : line.text)
-            .font(.caption)
-            .multilineTextAlignment(.center)
-            .lineLimit(3)
-            .padding(8)
-            .frame(maxWidth: .infinity)
-            .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
-            .privacySensitive(line.sensitivity != .none)
+        let text = line.text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !text.isEmpty {
+            Text(redactsText ? "Kiri is nearby." : text)
+                .font(.caption)
+                .multilineTextAlignment(.center)
+                .lineLimit(3)
+                .padding(8)
+                .frame(maxWidth: .infinity)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
+                .privacySensitive(line.sensitivity != .none)
+        }
     }
 }
 

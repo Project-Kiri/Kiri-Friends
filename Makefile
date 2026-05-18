@@ -143,6 +143,10 @@ debug-relay: ## Run the Cloud Relay debug CLI against an already-running relay.
 verify-watch-assets: ## SHA-diff the Watch theme assets against KiriFriendsBuddyMac canonical files.
 	bash Scripts/verify-watch-assets.sh
 
+.PHONY: generate-watch-animation-assets
+generate-watch-animation-assets: ## Generate Watch animation frames from Mac Buddy canonical SVG assets.
+	node Scripts/generate-watch-animation-frames.mjs
+
 .PHONY: dev-plugin
 dev-plugin: ## Start CLI plugin TypeScript dev watch mode.
 	cd $(PLUGINS_DIR) && $(NPM) run typecheck -- --watch

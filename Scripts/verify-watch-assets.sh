@@ -76,4 +76,5 @@ done < <(find "$WATCH_ROOT" -name '*.imageset' -type d)
 if [[ "$fail" -ne 0 ]]; then
   exit 1
 fi
+node "$REPO_ROOT/Scripts/verify-watch-animation-assets.mjs"
 echo "verify-watch-assets: all Watch buddy assets match KiriFriendsBuddyMac canonical files."

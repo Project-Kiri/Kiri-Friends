@@ -14,32 +14,42 @@ struct KiriFriendsWatchApp: App {
 struct ContentView: View {
     @State private var watchStore = WatchSessionStore()
     @State private var selectedSessionId: String?
+    @State private var activeApprovalPrompt: ApprovalPrompt?
+    @State private var presentedApprovalIDs: Set<String> = []
 
     private var activeTheme: BundledBuddyTheme {
         BundledBuddyThemeRegistry.theme(identifier: watchStore.buddySettings?.activeManifestId)
+    }
+
+    private var showsCommandsTab: Bool {
+        snapshotSessions(from: watchStore.snapshot).contains {
+            !$0.commandOptionsExcludingApproval.isEmpty
+        }
     }
 
     var body: some View {
         TabView {
             StatusView(
                 snapshot: watchStore.snapshot,
-                theme: activeTheme,
-                sendAction: watchStore.sendAction
+                theme: activeTheme
             )
             .tabItem { Label("Status", systemImage: "waveform") }
 
             SessionsView(
                 snapshot: watchStore.snapshot,
-                selection: $selectedSessionId
+                selection: $selectedSessionId,
+                openApproval: presentApprovalPrompt
             )
             .tabItem { Label("Sessions", systemImage: "rectangle.stack") }
 
-            CommandsView(
-                snapshot: watchStore.snapshot,
-                selectedSessionId: $selectedSessionId,
-                sendAction: watchStore.sendAction
-            )
-            .tabItem { Label("Commands", systemImage: "command") }
+            if showsCommandsTab {
+                CommandsView(
+                    snapshot: watchStore.snapshot,
+                    selectedSessionId: $selectedSessionId,
+                    sendAction: watchStore.sendAction
+                )
+                .tabItem { Label("Commands", systemImage: "command") }
+            }
 
             SettingsView(
                 snapshot: watchStore.snapshot,
@@ -48,22 +58,208 @@ struct ContentView: View {
             )
                 .tabItem { Label("Settings", systemImage: "gear") }
         }
+        .sheet(item: $activeApprovalPrompt) { prompt in
+            ApprovalPromptCard(
+                prompt: prompt,
+                sendAction: { action in sendApprovalAction(action, prompt: prompt) }
+            )
+            .interactiveDismissDisabled()
+        }
         .onAppear {
             watchStore.activate()
             if selectedSessionId == nil {
                 selectedSessionId = watchStore.snapshot.session?.id
             }
+            presentApprovalPromptIfNeeded(for: watchStore.snapshot)
         }
         .onChange(of: watchStore.snapshot.session?.id) { _, newValue in
             if selectedSessionId == nil { selectedSessionId = newValue }
         }
+        .onChange(of: watchStore.snapshot) { _, newValue in
+            presentApprovalPromptIfNeeded(for: newValue)
+        }
+    }
+
+    private func presentApprovalPromptIfNeeded(for snapshot: StateSnapshot) {
+        guard let prompt = ApprovalPrompt(snapshot: snapshot) else {
+            activeApprovalPrompt = nil
+            return
+        }
+
+        guard !presentedApprovalIDs.contains(prompt.id) else { return }
+
+        presentedApprovalIDs.insert(prompt.id)
+        activeApprovalPrompt = prompt
+        KiriHaptics.approvalRequired()
+    }
+
+    private func presentApprovalPrompt(for session: CLISessionSummary) {
+        selectedSessionId = session.id
+        guard let prompt = ApprovalPrompt(snapshot: watchStore.snapshot, session: session) else {
+            KiriHaptics.selectionChanged()
+            return
+        }
+
+        activeApprovalPrompt = prompt
+        KiriHaptics.selectionChanged()
+    }
+
+    private func sendApprovalAction(_ action: WatchActionKind, prompt: ApprovalPrompt) {
+        switch action {
+        case .approvalAllow:
+            KiriHaptics.approvalAccepted()
+        case .approvalDeny:
+            KiriHaptics.approvalDenied()
+        case .taskStop, .promptSendQuick, .statusRefresh:
+            KiriHaptics.selectionChanged()
+        }
+
+        watchStore.sendAction(
+            WatchAction(
+                action: action,
+                sessionId: prompt.sessionId,
+                approvalId: prompt.approvalId,
+                createdAt: .now
+            )
+        )
+        activeApprovalPrompt = nil
+    }
+}
+
+private func snapshotSessions(from snapshot: StateSnapshot) -> [CLISessionSummary] {
+    if !snapshot.sessions.isEmpty { return snapshot.sessions }
+    if let session = snapshot.session { return [session] }
+    return []
+}
+
+private extension CLISessionSummary {
+    var commandOptionsExcludingApproval: [PendingWatchActionOption] {
+        switch state {
+        case .waitingForInput:
+            return [
+                PendingWatchActionOption(
+                    action: .promptSendQuick,
+                    title: "Reply",
+                    accessibilityHint: "Sends a quick reply to the active session."
+                ),
+            ]
+        case .waitingForApproval, .running, .idle, .failed, .completed, .unknown:
+            return []
+        }
+    }
+}
+
+private struct ApprovalPrompt: Identifiable, Equatable {
+    var id: String
+    var sessionId: String?
+    var approvalId: String?
+    var title: String
+    var summary: String
+    var sensitivity: PayloadSensitivity
+
+    init?(snapshot: StateSnapshot) {
+        if let approval = snapshot.approval {
+            id = approval.id
+            sessionId = approval.sessionId
+            approvalId = approval.id
+            title = approval.title
+            summary = approval.summary
+            sensitivity = approval.sensitivity
+            return
+        }
+
+        guard let session = snapshot.session, session.state == .waitingForApproval else {
+            return nil
+        }
+        id = "approval-\(session.id)"
+        sessionId = session.id
+        approvalId = nil
+        title = session.title
+        summary = session.summary
+        sensitivity = session.sensitivity
+    }
+
+    init?(snapshot: StateSnapshot, session: CLISessionSummary) {
+        if let approval = snapshot.approval, approval.sessionId == session.id {
+            id = approval.id
+            sessionId = approval.sessionId
+            approvalId = approval.id
+            title = approval.title
+            summary = approval.summary
+            sensitivity = approval.sensitivity
+            return
+        }
+
+        guard session.state == .waitingForApproval else {
+            return nil
+        }
+        id = "approval-\(session.id)"
+        sessionId = session.id
+        approvalId = nil
+        title = session.title
+        summary = session.summary
+        sensitivity = session.sensitivity
+    }
+
+    var options: [PendingWatchActionOption] {
+        [
+            PendingWatchActionOption(
+                action: .approvalAllow,
+                title: "Approve",
+                accessibilityHint: "Approves the current CLI action."
+            ),
+            PendingWatchActionOption(
+                action: .approvalDeny,
+                title: "Deny",
+                isDestructive: true,
+                accessibilityHint: "Denies the current CLI action."
+            ),
+        ]
+    }
+
+    var displayText: String {
+        let trimmedSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedSummary.isEmpty { return trimmedSummary }
+        return title
+    }
+}
+
+private struct ApprovalPromptCard: View {
+    let prompt: ApprovalPrompt
+    let sendAction: (WatchActionKind) -> Void
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Text(prompt.displayText)
+                .font(.title3)
+                .lineLimit(3)
+                .minimumScaleFactor(0.78)
+                .multilineTextAlignment(.leading)
+                .privacySensitive(prompt.sensitivity != .none)
+                .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+                .padding(14)
+                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .stroke(.white.opacity(0.14), lineWidth: 1)
+                }
+
+            PendingActionStrip(
+                options: prompt.options,
+                layout: .vertical,
+                sendAction: sendAction
+            )
+        }
+        .padding(.horizontal, 10)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Approval needed for \(prompt.displayText)")
     }
 }
 
 struct StatusView: View {
     let snapshot: StateSnapshot
     let theme: BundledBuddyTheme
-    let sendAction: (WatchAction) -> Void
 
     var body: some View {
         // Status is intentionally just the buddy stage. The agent label,
@@ -71,13 +267,14 @@ struct StatusView: View {
         // hint were removed so the primary action fits the first screen
         // (watchos-design-guidelines W-GL-01 / W-NV-05). Per-agent context
         // and additional sessions live one swipe away on the Sessions tab.
-        BuddyHomeView(snapshot: snapshot, theme: theme, sendAction: sendAction)
+        BuddyHomeView(snapshot: snapshot, theme: theme)
     }
 }
 
 struct SessionsView: View {
     let snapshot: StateSnapshot
     @Binding var selection: String?
+    let openApproval: (CLISessionSummary) -> Void
 
     var body: some View {
         sessionList
@@ -92,32 +289,52 @@ struct SessionsView: View {
 
     @ViewBuilder
     private var sessionList: some View {
-        let list = List(snapshot.sessions, selection: $selection) { session in
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(color(for: session.state))
-                    .frame(width: 8, height: 8)
-                if let tool = session.tool {
-                    Image(systemName: tool.symbolName)
-                        .symbolRenderingMode(.hierarchical)
-                        .frame(width: 18)
+        let list = List(snapshot.sessions) { session in
+            Button {
+                selection = session.id
+                if session.state == .waitingForApproval {
+                    openApproval(session)
+                } else {
+                    KiriHaptics.selectionChanged()
                 }
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(session.title)
-                        .font(.caption.weight(.semibold))
-                        .lineLimit(1)
-                    Text(session.state.rawValue)
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
+            } label: {
+                sessionRow(session)
             }
-            .tag(session.id)
+            .buttonStyle(.plain)
+            .accessibilityHint(accessibilityHint(for: session))
         }
         #if os(watchOS)
         list.listStyle(.carousel)
         #else
         list
         #endif
+    }
+
+    private func sessionRow(_ session: CLISessionSummary) -> some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(color(for: session.state))
+                .frame(width: 8, height: 8)
+            if let tool = session.tool {
+                Image(systemName: tool.symbolName)
+                    .symbolRenderingMode(.hierarchical)
+                    .frame(width: 18)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(session.title)
+                    .font(.caption.weight(.semibold))
+                    .lineLimit(1)
+                Text(session.state.rawValue)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+            if session.state == .waitingForApproval {
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     private func color(for state: SessionState) -> Color {
@@ -128,6 +345,17 @@ struct SessionsView: View {
         case .waitingForInput: return .purple
         case .completed: return .green
         case .idle, .unknown: return .gray
+        }
+    }
+
+    private func accessibilityHint(for session: CLISessionSummary) -> String {
+        switch session.state {
+        case .waitingForApproval:
+            return "Opens the approval actions for this session."
+        case .waitingForInput:
+            return "Selects this session for reply actions."
+        case .running, .idle, .failed, .completed, .unknown:
+            return "Selects this session."
         }
     }
 }
@@ -157,7 +385,7 @@ struct CommandsView: View {
 
     @ViewBuilder
     private var actionButtons: some View {
-        let options = PendingWatchActionOption.options(for: snapshot, targetSession: targetSession)
+        let options = targetSession?.commandOptionsExcludingApproval ?? []
         if options.isEmpty {
             Text("No actions pending")
                 .font(.caption)

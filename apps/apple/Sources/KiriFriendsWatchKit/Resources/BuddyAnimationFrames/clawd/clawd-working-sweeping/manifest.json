@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "theme": "clawd",
+  "sourceFile": "clawd-working-sweeping.svg",
+  "sourceSha256": "bc6d786ac733297d1e3f222e8a2a370bcccf301a8f9ea6b1989c436a02282687",
+  "durationMs": 300000,
+  "frameSize": 192,
+  "frames": [
+    "frame-000.png",
+    "frame-001.png",
+    "frame-002.png",
+    "frame-003.png",
+    "frame-004.png",
+    "frame-005.png",
+    "frame-006.png",
+    "frame-007.png",
+    "frame-008.png",
+    "frame-009.png",
+    "frame-010.png",
+    "frame-011.png",
+    "frame-012.png",
+    "frame-013.png",
+    "frame-014.png",
+    "frame-015.png",
+    "frame-016.png",
+    "frame-017.png",
+    "frame-018.png",
+    "frame-019.png",
+    "frame-020.png",
+    "frame-021.png",
+    "frame-022.png",
+    "frame-023.png"
+  ],
+  "posterFrame": "frame-000.png",
+  "layout": {
+    "viewBox": {
+      "x": -15,
+      "y": -25,
+      "width": 45,
+      "height": 45
+    },
+    "contentBox": {
+      "x": -4,
+      "y": -3,
+      "width": 23,
+      "height": 20
+    },
+    "centerX": 7.5,
+    "baselineY": 17,
+    "visibleHeightRatio": 0.58,
+    "baselineBottomRatio": 0.05
+  }
+}

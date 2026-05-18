@@ -19,10 +19,16 @@ public struct BundledBuddyTheme: Sendable, Hashable, Identifiable {
     /// Namespace prefix used inside `Themes.xcassets`. The Asset Catalog
     /// resolves each asset as `"<namespace>/<state-filename-stem>"`.
     public let namespace: String
+    public let animationSpec: BuddyAnimationSpec?
 
-    public init(manifest: BuddyAssetManifest, namespace: String) {
+    public init(
+        manifest: BuddyAssetManifest,
+        namespace: String,
+        animationSpec: BuddyAnimationSpec? = nil
+    ) {
         self.manifest = manifest
         self.namespace = namespace
+        self.animationSpec = animationSpec
     }
 
     public var id: String { manifest.identifier }
@@ -73,7 +79,8 @@ public enum BundledBuddyThemeRegistry {
                 .failed: ["clawd-error.svg"],
             ]
         ),
-        namespace: "clawd"
+        namespace: "clawd",
+        animationSpec: .clawd
     )
 
     public static let calico = BundledBuddyTheme(

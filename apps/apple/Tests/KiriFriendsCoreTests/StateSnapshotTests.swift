@@ -48,7 +48,28 @@ import Testing
 
     #expect(presentation.state == .attention)
     #expect(presentation.primaryAction == .approvalAllow)
-    #expect(presentation.speech.text == "Run tests")
+    #expect(presentation.speech.text == "")
+    #expect(presentation.speech.sensitivity == .none)
+}
+
+@Test func buddyPresentationDoesNotTurnCLIContextIntoPetSpeech() {
+    let snapshot = StateSnapshot(
+        updatedAt: Date(timeIntervalSince1970: 0),
+        activeTool: .codex,
+        connectionState: .relayConnected,
+        session: CLISessionSummary(
+            id: "running-session",
+            state: .running,
+            title: "Codex",
+            summary: "make test-server",
+            sensitivity: .none,
+            tool: .codex
+        )
+    )
+
+    let presentation = BuddyPresentationReducer.presentation(for: snapshot)
+    #expect(presentation.state == .running)
+    #expect(presentation.speech.text == "")
 }
 
 @Test func primaryActionOnlyExistsForHookDrivenStates() {

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "theme": "clawd",
+  "sourceFile": "clawd-wake.svg",
+  "sourceSha256": "56c3e77d5248d0ec0fa64d1b7e9b77ae7189a52e45da7efe2cbbae1986b10c23",
+  "durationMs": 1500,
+  "frameSize": 192,
+  "frames": [
+    "frame-000.png",
+    "frame-001.png",
+    "frame-002.png",
+    "frame-003.png",
+    "frame-004.png",
+    "frame-005.png",
+    "frame-006.png",
+    "frame-007.png"
+  ],
+  "posterFrame": "frame-000.png",
+  "layout": {
+    "viewBox": {
+      "x": -15,
+      "y": -25,
+      "width": 45,
+      "height": 45
+    },
+    "contentBox": {
+      "x": -4,
+      "y": -3,
+      "width": 23,
+      "height": 20
+    },
+    "centerX": 7.5,
+    "baselineY": 17,
+    "visibleHeightRatio": 0.58,
+    "baselineBottomRatio": 0.05
+  }
+}

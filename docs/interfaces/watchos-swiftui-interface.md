@@ -32,32 +32,51 @@ TabView {
 
 ## BuddyHomeView
 
-Displays Kiri's current buddy state, concise speech, current task state, and hook-driven pending actions.
+Displays Kiri's current buddy state in a fixed, non-scrolling glanceable
+layout. The visible buddy art is vertically centered. CLI task context such as
+`approval.summary`, `session.summary`, or `session.title` stays in the approval
+sheet, Sessions tab, and complications; it is not rendered as pet speech. The
+Status page hides the speech row unless a future snapshot field carries explicit
+buddy utterance text.
+
+The buddy animation path mirrors `clawd-on-desk` rather than applying a generic
+scale loop to a single image. `BundledBuddyTheme.animationSpec` carries the
+desktop theme semantics (`states`, `workingTiers`, `idleAnimations`,
+`timings`, and layout metadata). `BuddyAnimationResolver` maps the current
+`StateSnapshot` into a desktop visual state such as `notification`, `working`,
+or `error`, and `BuddyAnimationPlayer` plays the generated PNG frame sequence
+from `Resources/BuddyAnimationFrames`. Static Asset Catalog SVGs remain a
+fallback only when a frame manifest is unavailable.
 
 ```swift
 struct BuddyHomeView: View {
     let snapshot: StateSnapshot
-    let sendAction: (WatchAction) -> Void
 
     var body: some View {
-        ScrollView {
-            BuddyStageView(presentation: BuddyPresentationReducer.presentation(for: snapshot))
+        VStack {
+            BuddyStageView(
+                snapshot: snapshot,
+                presentation: BuddyPresentationReducer.presentation(for: snapshot)
+            )
             BuddySpeechBubble(line: presentation.speech)
-            PendingActionStrip()
         }
     }
 }
 ```
 
-Pending actions only appear for hook-triggered states. `waitingForApproval`
-shows `Approve` and `Deny`; `waitingForInput` shows `Reply`. The highlighted
-action receives SwiftUI `handGestureShortcut(.primaryAction)`, so Apple Watch
-Double Tap selects the highlighted option while the touch button remains the
-fallback. Wrist rotation is interpreted with foreground-only Core Motion device
-motion updates; it switches the highlighted option with threshold, cooldown,
-and neutral reset logic to avoid repeated triggers. Wrist-down Always On state
-uses `isLuminanceReduced` for redaction and low-motion display; it is not a
-command input and never starts motion updates.
+Approval actions are not embedded in the Status page. When a new approval
+arrives, `ContentView` presents a native SwiftUI `sheet(item:)` using the
+approval as the `Identifiable` data source. The sheet uses a Long Look-style
+vertical layout: command summary card first, then large full-width
+`Approve` / `Deny` action pills. The same `PendingActionStrip` remains
+available inside the sheet in vertical mode. The highlighted action receives SwiftUI
+`handGestureShortcut(.primaryAction)`, so Apple Watch Double Tap selects the
+highlighted option while the touch button remains the fallback. Wrist rotation
+is interpreted with foreground-only Core Motion device motion updates; it
+switches the highlighted option with threshold, cooldown, and neutral reset
+logic to avoid repeated triggers. Wrist-down Always On state uses
+`isLuminanceReduced` for redaction and low-motion display; it is not a command
+input and never starts motion updates.
 
 On first launch or after clearing local state, the Watch starts from a neutral
 empty snapshot instead of the sample approval fixture. Cached copies of the
@@ -66,11 +85,14 @@ sample `StateSnapshot.placeholder` are discarded so mock text such as
 
 ## Commands and Health
 
-The Commands tab uses the same `PendingActionStrip` mapping as Status. It sends
-`approval.allow`, `approval.deny`, and `prompt.sendQuick` as `WatchAction`
-messages only when the selected session is in a hook-driven pending state.
-Each action is session-scoped when a session is selected; otherwise it falls
-back to the priority-resolved primary session.
+The Sessions tab doubles as the multi-session entry point. Tapping a
+`waitingForApproval` row opens that session's approval sheet directly; tapping
+other rows only selects the target session for non-approval actions.
+
+The Commands tab is only shown when a non-approval hook action is pending, such
+as `waitingForInput` quick replies. Approval actions are intentionally excluded
+from Commands so the Watch never shows a second `Approve` / `Deny` page for the
+same request.
 
 The Settings tab can send a low-sensitivity `health.signal.summary` through
 WatchConnectivity. The iPhone only folds this into `StateSnapshot` when the

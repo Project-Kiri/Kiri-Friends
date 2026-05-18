@@ -31,6 +31,8 @@ public final class WatchSessionStore: NSObject {
     }
 
     public func sendAction(_ action: WatchAction) {
+        applyOptimisticDecision(for: action)
+
         do {
             let payload = try WatchConnectivityPayload.dictionary(from: action)
             session.sendMessage(payload, replyHandler: nil) { [weak self] error in
@@ -81,6 +83,36 @@ public final class WatchSessionStore: NSObject {
         self.snapshot = snapshot
         cache.save(snapshot)
     }
+
+    func applyOptimisticDecision(for action: WatchAction) {
+        guard action.action == .approvalAllow || action.action == .approvalDeny else { return }
+
+        let targetSessionId = action.sessionId ?? snapshot.approval?.sessionId ?? snapshot.session?.id
+        let nextState: SessionState = action.action == .approvalAllow ? .running : .failed
+
+        var next = snapshot
+        next.updatedAt = action.createdAt
+        next.approval = nil
+
+        if let targetSessionId, next.session?.id == targetSessionId {
+            next.session?.state = nextState
+            next.session?.title = ""
+            next.session?.summary = ""
+            next.session?.sensitivity = .none
+        }
+
+        next.sessions = next.sessions.map { session in
+            guard let targetSessionId, session.id == targetSessionId else { return session }
+            var updated = session
+            updated.state = nextState
+            updated.title = ""
+            updated.summary = ""
+            updated.sensitivity = .none
+            return updated
+        }
+
+        apply(next)
+    }
 }
 
 extension WatchSessionStore: WCSessionDelegate {
@@ -123,7 +155,9 @@ public final class WatchSessionStore {
     }
 
     public func activate() {}
-    public func sendAction(_ action: WatchAction) {}
+    public func sendAction(_ action: WatchAction) {
+        applyOptimisticDecision(for: action)
+    }
     public func sendHealthSummary(_ summary: HealthSignalSummary) {}
 
     public func ingest(applicationContext: [String: Any]) {
@@ -142,6 +176,37 @@ public final class WatchSessionStore {
                 break
             }
         }
+    }
+
+    func applyOptimisticDecision(for action: WatchAction) {
+        guard action.action == .approvalAllow || action.action == .approvalDeny else { return }
+
+        let targetSessionId = action.sessionId ?? snapshot.approval?.sessionId ?? snapshot.session?.id
+        let nextState: SessionState = action.action == .approvalAllow ? .running : .failed
+
+        var next = snapshot
+        next.updatedAt = action.createdAt
+        next.approval = nil
+
+        if let targetSessionId, next.session?.id == targetSessionId {
+            next.session?.state = nextState
+            next.session?.title = ""
+            next.session?.summary = ""
+            next.session?.sensitivity = .none
+        }
+
+        next.sessions = next.sessions.map { session in
+            guard let targetSessionId, session.id == targetSessionId else { return session }
+            var updated = session
+            updated.state = nextState
+            updated.title = ""
+            updated.summary = ""
+            updated.sensitivity = .none
+            return updated
+        }
+
+        snapshot = next
+        cache.save(next)
     }
 }
 #endif

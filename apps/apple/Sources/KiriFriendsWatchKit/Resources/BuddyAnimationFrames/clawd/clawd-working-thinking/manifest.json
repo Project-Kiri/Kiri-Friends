@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "theme": "clawd",
+  "sourceFile": "clawd-working-thinking.svg",
+  "sourceSha256": "fa73d5f9eed0a27746cc9a9b92d90f15da61171afe4fb01fb681132af22068a5",
+  "durationMs": 1000,
+  "frameSize": 192,
+  "frames": [
+    "frame-000.png",
+    "frame-001.png",
+    "frame-002.png",
+    "frame-003.png",
+    "frame-004.png",
+    "frame-005.png",
+    "frame-006.png",
+    "frame-007.png"
+  ],
+  "posterFrame": "frame-000.png",
+  "layout": {
+    "viewBox": {
+      "x": -15,
+      "y": -25,
+      "width": 45,
+      "height": 45
+    },
+    "contentBox": {
+      "x": -4,
+      "y": -3,
+      "width": 23,
+      "height": 20
+    },
+    "centerX": 7.5,
+    "baselineY": 17,
+    "visibleHeightRatio": 0.58,
+    "baselineBottomRatio": 0.05
+  }
+}
