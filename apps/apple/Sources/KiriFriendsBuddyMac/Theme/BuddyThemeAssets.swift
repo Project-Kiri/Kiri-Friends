@@ -14,7 +14,7 @@ public enum BuddyThemeAssets {
     /// themes. Empty when the bundle has no Themes subdirectory (which
     /// would indicate a packaging bug).
     public static var bundledThemesDirectory: URL? {
-        Bundle.module.url(forResource: "Themes", withExtension: nil)
+        Bundle.main.url(forResource: "Themes", withExtension: nil)
     }
 
     /// Loads the theme manifest by identifier, returning nil when the

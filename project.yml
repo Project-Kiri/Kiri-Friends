@@ -103,6 +103,11 @@ targets:
     deploymentTarget: "15.0"
     sources:
       - path: apps/apple/Sources/KiriFriendsBuddyMac
+        excludes:
+          - "Resources/**"
+    resources:
+      - path: apps/apple/Sources/KiriFriendsBuddyMac/Resources/Themes
+        type: folder
     info:
       path: apps/apple/Configuration/KiriFriendsBuddyMac-Info.plist
       properties:
