@@ -20,7 +20,7 @@ public final class BridgeStateStore {
     // agents do not collide even when they reuse a "default" sessionId.
     private var sessions: [SessionKey: TrackedSession] = [:]
 
-    public init(latestSnapshot: StateSnapshot = .placeholder) {
+    public init(latestSnapshot: StateSnapshot = .empty) {
         self.latestSnapshot = latestSnapshot
         self.lastEventId = nil
     }
@@ -40,6 +40,11 @@ public final class BridgeStateStore {
 
     public func updateConnectionState(_ connectionState: ConnectionState, now: Date = Date()) {
         latestSnapshot.connectionState = connectionState
+        latestSnapshot.updatedAt = now
+    }
+
+    public func updateHealthSummary(_ summary: HealthSignalSummary?, now: Date = Date()) {
+        latestSnapshot.healthSummary = summary
         latestSnapshot.updatedAt = now
     }
 
@@ -87,7 +92,8 @@ private extension BridgeStateStore {
         case noOp
 
         init?(envelope: RelayEventEnvelope) {
-            let toolRaw = envelope.payload["tool"]?.stringValue
+            let toolRaw = envelope.tool
+                ?? envelope.payload["tool"]?.stringValue
                 ?? (envelope.payload["payload"].flatMap { value -> String? in
                     if case let .object(nested) = value { return nested["tool"]?.stringValue }
                     return nil

@@ -75,6 +75,35 @@ struct WatchConnectivityEnvelopeTests {
 
 @Suite("WatchSessionStore dispatch")
 struct WatchSessionStoreDispatchTests {
+    @Test("Empty watch cache starts from neutral runtime state")
+    func emptyCacheStartsNeutral() {
+        let suite = "kiri-watch-dispatch-empty-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let cache = WatchStateCache(defaults: defaults, key: "snapshot")
+        let store = WatchSessionStore(cache: cache)
+
+        #expect(store.snapshot == .empty)
+        #expect(store.snapshot.session == nil)
+        #expect(store.snapshot.approval == nil)
+    }
+
+    @Test("Cached placeholder is ignored for runtime startup")
+    func cachedPlaceholderIsIgnored() {
+        let suite = "kiri-watch-dispatch-placeholder-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let cache = WatchStateCache(defaults: defaults, key: "snapshot")
+        cache.save(.placeholder)
+
+        let store = WatchSessionStore(cache: cache)
+
+        #expect(store.snapshot == .empty)
+        #expect(cache.loadSnapshot() == nil)
+    }
+
     @Test("Ingest applies snapshot and buddy settings concurrently")
     func ingestAppliesBothKinds() throws {
         let suite = "kiri-watch-dispatch-\(UUID().uuidString)"

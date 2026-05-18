@@ -32,11 +32,16 @@ The Cloud Relay server implements a thin HTTP layer over `RelayStore`
 | Route | Method | Caller | Notes |
 | --- | --- | --- | --- |
 | `/healthz` | GET | any | Liveness check (no auth) |
-| `/v1/plugin-events` | POST | Mac Buddy / CLI host bridge | Ingests `PluginEventEnvelope`. Body fields: `event`, `sessionId?`, `payload`. |
+| `/v1/devices/iphone` | POST | iPhone companion | Registers an iPhone companion and returns a device token. |
+| `/v1/devices/mac` | POST | Mac Buddy / CLI host bridge | Registers a Mac bridge and returns a device token plus pairing code. |
+| `/v1/pairings/approve` | POST | iPhone companion | Approves a Mac pairing code for the authenticated user. |
+| `/v1/plugin-events` | POST | Mac Buddy / CLI host bridge | Ingests `PluginEventEnvelope`. The relay preserves top-level `version`, `tool`, `event`, `sessionId`, `cwd`, `createdAt`, `sensitivity`, and `payload`. |
 | `/v1/events` | GET | iPhone companion | Lists events for the calling user; supports `since=<eventId>` cursor. |
 | `/v1/requests` | POST | iPhone companion | Enqueues a downlink request for the paired Mac. |
 | `/v1/requests/pending` | GET | Mac Buddy / CLI host bridge | Returns queued requests for the calling device. |
+| `/v1/requests/:requestId/ack` | POST | Mac Buddy / CLI host bridge | Moves a request to `accepted`, `completed`, `failed`, `expired`, or `superseded`; completion can include a result object or error string. |
 | `/v1/heartbeat` | POST | any authenticated device | Updates the device's presence record. |
+| `/v1/presence` | GET | any authenticated device | Lists presence records for the authenticated user's devices; accepts optional `deviceId`. |
 
 Run the development server with `make dev-relay` (binds `127.0.0.1:8585`
 by default; override with `KIRI_RELAY_HOST` / `KIRI_RELAY_PORT`).
@@ -132,7 +137,7 @@ The relay may replay recent high-priority events. Output chunks may be dropped o
 
 ## Request Types
 
-### `status.get`
+### `status.refresh`
 
 Get current normalized CLI status.
 
@@ -142,13 +147,14 @@ Get current normalized CLI status.
   "id": "request-uuid",
   "type": "request",
   "createdAt": "2026-05-17T12:00:00Z",
+  "idempotencyKey": "status-refresh-20260517T120000Z",
   "payload": {
-    "action": "status.get"
+    "action": "status.refresh"
   }
 }
 ```
 
-### `prompt.send`
+### `prompt.sendQuick`
 
 Send a short prompt to the active CLI session.
 
@@ -159,8 +165,9 @@ Send a short prompt to the active CLI session.
   "type": "request",
   "createdAt": "2026-05-17T12:00:00Z",
   "expiresAt": "2026-05-17T12:00:30Z",
+  "idempotencyKey": "quick-reply-session-uuid",
   "payload": {
-    "action": "prompt.send",
+    "action": "prompt.sendQuick",
     "sessionId": "session-uuid",
     "text": "Explain this error"
   }
@@ -178,6 +185,7 @@ Stop the current running task for a specific session.
   "type": "request",
   "createdAt": "2026-05-17T12:00:00Z",
   "expiresAt": "2026-05-17T12:00:15Z",
+  "idempotencyKey": "stop-session-uuid",
   "payload": {
     "action": "task.stop",
     "sessionId": "session-uuid"
@@ -185,7 +193,7 @@ Stop the current running task for a specific session.
 }
 ```
 
-### `approval.decide`
+### `approval.allow` / `approval.deny`
 
 Approve or deny a CLI permission request.
 
@@ -197,11 +205,11 @@ Approve or deny a CLI permission request.
   "type": "request",
   "createdAt": "2026-05-17T12:00:00Z",
   "expiresAt": "2026-05-17T12:00:12Z",
+  "idempotencyKey": "approval-approval-uuid-allow",
   "payload": {
-    "action": "approval.decide",
+    "action": "approval.allow",
     "sessionId": "session-uuid",
-    "approvalId": "approval-uuid",
-    "decision": "allow"
+    "approvalId": "approval-uuid"
   }
 }
 ```

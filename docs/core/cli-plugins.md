@@ -28,6 +28,12 @@ Preferred local transports:
 
 The CLI Host Bridge owns both endpoints. Plugins should use short client timeouts and never assume the bridge is running. The Cloud Relay Server is the only cross-device message relay; plugins never talk to it directly.
 
+The TypeScript `LocalBridgeClient` resolves localhost HTTP targets in this
+order: explicitly configured port, `KIRI_BRIDGE_PORT`, runtime JSON
+configuration, configured fallback ports, then the default `7474`. This
+mirrors Clawd-on-Desk's runtime config fallback while keeping Kiri's Cloud
+Relay credentials out of plugins.
+
 ## Common Plugin Event Envelope
 
 ```json
@@ -38,6 +44,7 @@ The CLI Host Bridge owns both endpoints. Plugins should use short client timeout
   "sessionId": "session-id-from-host",
   "cwd": "/Users/example/project",
   "createdAt": "2026-05-17T12:00:00Z",
+  "sensitivity": "preview",
   "payload": {
     "title": "Approve shell command?",
     "summary": "Run tests"

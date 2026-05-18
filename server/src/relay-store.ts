@@ -132,11 +132,32 @@ export class RelayStore {
     return this.presence.get(deviceId);
   }
 
+  getPresenceForUser(userId: string, deviceId: string): PresenceRecord | undefined {
+    const device = this.devices.get(deviceId);
+    if (!device || device.userId !== userId || device.revokedAt) return undefined;
+    return this.presence.get(deviceId);
+  }
+
+  listPresenceForUser(userId: string): PresenceRecord[] {
+    const ownedDeviceIds = new Set(
+      [...this.devices.values()]
+        .filter((device) => device.userId === userId && !device.revokedAt)
+        .map((device) => device.id),
+    );
+    return [...this.presence.values()]
+      .filter((record) => ownedDeviceIds.has(record.deviceId))
+      .sort((left, right) => Date.parse(right.lastHeartbeatAt) - Date.parse(left.lastHeartbeatAt));
+  }
+
   ingestEvent(input: {
     userId: string;
     sourceDeviceId: string;
+    version?: 1;
+    tool?: string;
     event: string;
     sessionId?: string;
+    cwd?: string;
+    createdAt?: string;
     payload: Record<string, unknown>;
     sensitivity?: RelayEvent["sensitivity"];
   }): RelayEvent {
@@ -153,10 +174,13 @@ export class RelayStore {
       userId: input.userId,
       sourceDeviceId: input.sourceDeviceId,
       event: input.event,
-      createdAt: this.now().toISOString(),
+      createdAt: input.createdAt ?? this.now().toISOString(),
       payload: input.payload,
       sensitivity: input.sensitivity ?? "preview",
     };
+    if (input.version !== undefined) event.version = input.version;
+    if (input.tool !== undefined) event.tool = input.tool;
+    if (input.cwd !== undefined) event.cwd = input.cwd;
     if (input.sessionId !== undefined) event.sessionId = input.sessionId;
     this.events.set(event.eventId, event);
     return event;
@@ -201,6 +225,7 @@ export class RelayStore {
       targetDeviceId: input.targetDeviceId,
       kind: input.kind,
       createdAt: this.now().toISOString(),
+      updatedAt: this.now().toISOString(),
       expiresAt: input.expiresAt,
       idempotencyKey: input.idempotencyKey,
       payload: input.payload,
@@ -217,10 +242,28 @@ export class RelayStore {
     return request;
   }
 
-  ackRequest(requestId: string, status: Exclude<RequestStatus, "queued">): RelayRequest {
+  getRequest(requestId: string): RelayRequest | undefined {
+    return this.requests.get(requestId);
+  }
+
+  ackRequest(
+    requestId: string,
+    status: Exclude<RequestStatus, "queued">,
+    details: { result?: Record<string, unknown>; error?: string } = {},
+  ): RelayRequest {
     const request = this.requests.get(requestId);
     if (!request) throw new Error("request not found");
+    const now = this.now().toISOString();
     request.status = Date.parse(request.expiresAt) <= this.now().getTime() ? "expired" : status;
+    request.updatedAt = now;
+    if (status === "accepted") {
+      request.acknowledgedAt = now;
+    }
+    if (status === "completed" || status === "failed" || status === "expired" || status === "superseded") {
+      request.completedAt = now;
+    }
+    if (details.result !== undefined) request.result = details.result;
+    if (details.error !== undefined) request.error = details.error;
     return request;
   }
 

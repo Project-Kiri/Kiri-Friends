@@ -5,6 +5,7 @@
 // with bridge-side metadata before forwarding to the Cloud Relay.
 
 import Foundation
+import KiriFriendsCore
 
 public enum PluginEventKind: String, Codable, Sendable, Hashable, CaseIterable {
     case sessionStarted = "session.started"
@@ -47,6 +48,7 @@ public struct PluginEventEnvelope: Codable, Sendable, Hashable {
     public var cwd: String?
     public var createdAt: String
     public var payload: PluginEventPayload
+    public var sensitivity: PayloadSensitivity?
 
     public init(
         version: Int = 1,
@@ -55,7 +57,8 @@ public struct PluginEventEnvelope: Codable, Sendable, Hashable {
         sessionId: String? = nil,
         cwd: String? = nil,
         createdAt: String,
-        payload: PluginEventPayload = PluginEventPayload()
+        payload: PluginEventPayload = PluginEventPayload(),
+        sensitivity: PayloadSensitivity? = nil
     ) {
         self.version = version
         self.tool = tool
@@ -64,6 +67,7 @@ public struct PluginEventEnvelope: Codable, Sendable, Hashable {
         self.cwd = cwd
         self.createdAt = createdAt
         self.payload = payload
+        self.sensitivity = sensitivity
     }
 
     public var agentIdentifier: AgentIdentifier? {

@@ -66,6 +66,35 @@ test("healthz is unauthenticated", async () => {
   }
 });
 
+test("registers devices and approves pairing over HTTP", async () => {
+  const { port, close } = await bootStore();
+  try {
+    const iphoneResponse = await performRequest(port, "POST", "/v1/devices/iphone", {
+      body: { userId: "user-1", name: "Steven iPhone" },
+    });
+    assert.equal(iphoneResponse.statusCode, 201);
+    const iphone = JSON.parse(iphoneResponse.body) as { deviceId: string; deviceToken: string };
+
+    const macResponse = await performRequest(port, "POST", "/v1/devices/mac", {
+      body: { userId: "user-1", name: "MacBook" },
+    });
+    assert.equal(macResponse.statusCode, 201);
+    const mac = JSON.parse(macResponse.body) as { deviceId: string; pairingCode: string };
+    assert.equal(mac.pairingCode.length, 6);
+
+    const pairingResponse = await performRequest(port, "POST", "/v1/pairings/approve", {
+      token: iphone.deviceToken,
+      body: { pairingCode: mac.pairingCode },
+    });
+    assert.equal(pairingResponse.statusCode, 201);
+    const pairing = JSON.parse(pairingResponse.body) as { iphoneDeviceId: string; macDeviceId: string };
+    assert.equal(pairing.iphoneDeviceId, iphone.deviceId);
+    assert.equal(pairing.macDeviceId, mac.deviceId);
+  } finally {
+    await close();
+  }
+});
+
 test("ingest event requires Mac bridge auth", async () => {
   const { port, close, store } = await bootStore();
   try {
@@ -84,12 +113,34 @@ test("ingest event requires Mac bridge auth", async () => {
     const mac = store.registerMac("user-1", "MacBook");
     const accepted = await performRequest(port, "POST", "/v1/plugin-events", {
       token: mac.deviceToken,
-      body: { event: "tool.started", sessionId: "s-1", payload: { tool: "codex" } },
+      body: {
+        version: 1,
+        tool: "codex",
+        event: "tool.started",
+        sessionId: "s-1",
+        cwd: "/tmp/project",
+        createdAt: "2026-05-17T12:00:00Z",
+        sensitivity: "preview",
+        payload: { toolName: "Bash" },
+      },
     });
     assert.equal(accepted.statusCode, 201);
-    const stored = JSON.parse(accepted.body) as { event: string; sessionId?: string };
+    const stored = JSON.parse(accepted.body) as {
+      version?: number;
+      tool?: string;
+      event: string;
+      sessionId?: string;
+      cwd?: string;
+      createdAt: string;
+      payload: Record<string, unknown>;
+    };
+    assert.equal(stored.version, 1);
+    assert.equal(stored.tool, "codex");
     assert.equal(stored.event, "tool.started");
     assert.equal(stored.sessionId, "s-1");
+    assert.equal(stored.cwd, "/tmp/project");
+    assert.equal(stored.createdAt, "2026-05-17T12:00:00Z");
+    assert.deepEqual(stored.payload, { toolName: "Bash" });
   } finally {
     await close();
   }
@@ -178,6 +229,44 @@ test("enqueue request requires iPhone auth", async () => {
   }
 });
 
+test("acks pending requests with completion payloads", async () => {
+  const { port, close, store } = await bootStore();
+  try {
+    const iphone = store.registerIPhone("user-1", "iPhone");
+    const mac = store.registerMac("user-1", "MacBook");
+    const queued = await performRequest(port, "POST", "/v1/requests", {
+      token: iphone.deviceToken,
+      body: {
+        targetDeviceId: mac.deviceId,
+        kind: "status.refresh",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        idempotencyKey: "refresh-1",
+        payload: {},
+      },
+    });
+    const requestId = (JSON.parse(queued.body) as { requestId: string }).requestId;
+
+    const accepted = await performRequest(port, "POST", `/v1/requests/${requestId}/ack`, {
+      token: mac.deviceToken,
+      body: { status: "accepted" },
+    });
+    assert.equal(accepted.statusCode, 200);
+    assert.equal((JSON.parse(accepted.body) as { status: string; acknowledgedAt?: string }).status, "accepted");
+
+    const completed = await performRequest(port, "POST", `/v1/requests/${requestId}/ack`, {
+      token: mac.deviceToken,
+      body: { status: "completed", result: { refreshed: true } },
+    });
+    assert.equal(completed.statusCode, 200);
+    const parsed = JSON.parse(completed.body) as { status: string; completedAt?: string; result?: { refreshed?: boolean } };
+    assert.equal(parsed.status, "completed");
+    assert.equal(parsed.result?.refreshed, true);
+    assert.ok(parsed.completedAt);
+  } finally {
+    await close();
+  }
+});
+
 test("heartbeat updates presence", async () => {
   const { port, close, store } = await bootStore();
   try {
@@ -190,6 +279,13 @@ test("heartbeat updates presence", async () => {
     const presence = store.getPresence(mac.deviceId);
     assert.equal(presence?.state, "busy");
     assert.equal(presence?.activeSessionId, "session-1");
+
+    const listed = await performRequest(port, "GET", "/v1/presence", {
+      token: mac.deviceToken,
+    });
+    const parsed = JSON.parse(listed.body) as { presence: Array<{ deviceId: string; state: string }> };
+    assert.equal(parsed.presence.length, 1);
+    assert.equal(parsed.presence[0]?.deviceId, mac.deviceId);
   } finally {
     await close();
   }

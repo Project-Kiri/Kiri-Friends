@@ -27,9 +27,13 @@ struct KiriFriendsStatusProvider: TimelineProvider {
         completion(Timeline(entries: [entry], policy: .after(.now.addingTimeInterval(5 * 60))))
     }
 
+    static func runtimeSnapshot(from store: AppGroupSnapshotStore?) -> ComplicationSnapshot {
+        guard let snapshot = store?.loadComplicationSnapshot() else { return .empty }
+        return snapshot == .placeholder ? .empty : snapshot
+    }
+
     private func loadSnapshot() -> ComplicationSnapshot {
-        AppGroupSnapshotStore(suiteName: "group.com.kirifriends.shared")?
-            .loadComplicationSnapshot() ?? .placeholder
+        Self.runtimeSnapshot(from: AppGroupSnapshotStore(suiteName: "group.com.kirifriends.shared"))
     }
 }
 

@@ -8,7 +8,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 
 import type { RelayStore } from "./relay-store.js";
-import type { DeviceRecord, DeviceRole } from "./types.js";
+import type { DeviceRecord, DeviceRole, RequestStatus } from "./types.js";
 
 export type HTTPServerOptions = {
   store: RelayStore;
@@ -72,6 +72,15 @@ async function route(
     case "GET /healthz":
       writeJSON(response, 200, { status: "ok" });
       return;
+    case "POST /v1/devices/iphone":
+      await handleRegisterIPhone(store, request, response);
+      return;
+    case "POST /v1/devices/mac":
+      await handleRegisterMac(store, request, response);
+      return;
+    case "POST /v1/pairings/approve":
+      await handleApprovePairing(store, request, response);
+      return;
     case "POST /v1/plugin-events":
       await handleIngestEvent(store, request, response, url);
       return;
@@ -84,11 +93,86 @@ async function route(
     case "GET /v1/requests/pending":
       handleListPending(store, request, response, url);
       return;
+    case "GET /v1/presence":
+      handleListPresence(store, request, response, url);
+      return;
     case "POST /v1/heartbeat":
       await handleHeartbeat(store, request, response, url);
       return;
     default:
+      if (request.method === "POST" && url.path.startsWith("/v1/requests/") && url.path.endsWith("/ack")) {
+        await handleAckRequest(store, request, response, url);
+        return;
+      }
       writeError(response, 404, "not_found", `no route for ${key}`);
+  }
+}
+
+async function handleRegisterIPhone(
+  store: RelayStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  const body = await readBody(request);
+  const envelope = body ? safeParse(body) : null;
+  if (!envelope || typeof envelope !== "object") {
+    writeError(response, 400, "invalid_request", "body must be JSON object");
+    return;
+  }
+  const userId = (envelope as { userId?: unknown }).userId;
+  const name = (envelope as { name?: unknown }).name;
+  if (typeof userId !== "string" || userId.length === 0 || typeof name !== "string" || name.length === 0) {
+    writeError(response, 400, "invalid_request", "userId and name are required");
+    return;
+  }
+  writeJSON(response, 201, store.registerIPhone(userId, name));
+}
+
+async function handleRegisterMac(
+  store: RelayStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  const body = await readBody(request);
+  const envelope = body ? safeParse(body) : null;
+  if (!envelope || typeof envelope !== "object") {
+    writeError(response, 400, "invalid_request", "body must be JSON object");
+    return;
+  }
+  const userId = (envelope as { userId?: unknown }).userId;
+  const name = (envelope as { name?: unknown }).name;
+  if (typeof userId !== "string" || userId.length === 0 || typeof name !== "string" || name.length === 0) {
+    writeError(response, 400, "invalid_request", "userId and name are required");
+    return;
+  }
+  writeJSON(response, 201, store.registerMac(userId, name));
+}
+
+async function handleApprovePairing(
+  store: RelayStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+): Promise<void> {
+  const auth = authenticate(store, request, ["iphone_companion"]);
+  if (!auth.ok) {
+    writeError(response, auth.status, auth.code, auth.message);
+    return;
+  }
+  const body = await readBody(request);
+  const envelope = body ? safeParse(body) : null;
+  if (!envelope || typeof envelope !== "object") {
+    writeError(response, 400, "invalid_request", "body must be JSON object");
+    return;
+  }
+  const pairingCode = (envelope as { pairingCode?: unknown }).pairingCode;
+  if (typeof pairingCode !== "string" || pairingCode.length === 0) {
+    writeError(response, 400, "invalid_request", "pairingCode is required");
+    return;
+  }
+  try {
+    writeJSON(response, 201, store.approvePairing(auth.device.userId, auth.device.id, pairingCode));
+  } catch (error) {
+    writeError(response, 400, "invalid_request", error instanceof Error ? error.message : "pairing rejected");
   }
 }
 
@@ -123,10 +207,39 @@ async function handleIngestEvent(
     return;
   }
 
+  const version = (envelope as { version?: unknown }).version;
+  if (version !== undefined && version !== 1) {
+    writeError(response, 400, "schema_version_unsupported", "version must be 1");
+    return;
+  }
+  const tool = (envelope as { tool?: unknown }).tool;
+  if (tool !== undefined && (typeof tool !== "string" || tool.length === 0)) {
+    writeError(response, 400, "invalid_request", "tool must be a non-empty string");
+    return;
+  }
   const sessionId = (envelope as { sessionId?: unknown }).sessionId;
+  const cwd = (envelope as { cwd?: unknown }).cwd;
+  const createdAt = (envelope as { createdAt?: unknown }).createdAt;
+  const sensitivity = (envelope as { sensitivity?: unknown }).sensitivity;
   const payload = (envelope as { payload?: unknown }).payload;
   if (payload !== undefined && (payload === null || typeof payload !== "object")) {
     writeError(response, 400, "invalid_request", "payload must be an object");
+    return;
+  }
+  if (sessionId !== undefined && typeof sessionId !== "string") {
+    writeError(response, 400, "invalid_request", "sessionId must be a string");
+    return;
+  }
+  if (cwd !== undefined && typeof cwd !== "string") {
+    writeError(response, 400, "invalid_request", "cwd must be a string");
+    return;
+  }
+  if (createdAt !== undefined && (typeof createdAt !== "string" || Number.isNaN(Date.parse(createdAt)))) {
+    writeError(response, 400, "invalid_request", "createdAt must be an ISO-8601 string");
+    return;
+  }
+  if (sensitivity !== undefined && !isSensitivity(sensitivity)) {
+    writeError(response, 400, "invalid_request", "sensitivity must be none, preview, private, or secret");
     return;
   }
 
@@ -137,7 +250,12 @@ async function handleIngestEvent(
       event: eventName,
       payload: (payload as Record<string, unknown> | undefined) ?? {},
     };
+    if (version === 1) ingestInput.version = version;
+    if (typeof tool === "string") ingestInput.tool = tool;
     if (typeof sessionId === "string") ingestInput.sessionId = sessionId;
+    if (typeof cwd === "string") ingestInput.cwd = cwd;
+    if (typeof createdAt === "string") ingestInput.createdAt = createdAt;
+    if (isSensitivity(sensitivity)) ingestInput.sensitivity = sensitivity;
     const stored = store.ingestEvent(ingestInput);
     writeJSON(response, 201, stored);
   } catch (error) {
@@ -242,6 +360,80 @@ function handleListPending(
     return;
   }
   writeJSON(response, 200, { requests: store.listPendingRequests(deviceId) });
+}
+
+async function handleAckRequest(
+  store: RelayStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  url: ParsedURL,
+): Promise<void> {
+  const auth = authenticate(store, request, ["mac_bridge", "cli_host_bridge"]);
+  if (!auth.ok) {
+    writeError(response, auth.status, auth.code, auth.message);
+    return;
+  }
+  const requestId = requestIdFromAckPath(url.path);
+  if (!requestId) {
+    writeError(response, 404, "not_found", `no route for ${request.method ?? "POST"} ${url.path}`);
+    return;
+  }
+  const pendingRequest = store.getRequest(requestId);
+  if (!pendingRequest) {
+    writeError(response, 404, "device_not_found", "request not found");
+    return;
+  }
+  if (pendingRequest.targetDeviceId !== auth.device.id) {
+    writeError(response, 403, "not_authorized", "request belongs to another device");
+    return;
+  }
+
+  const body = await readBody(request);
+  const envelope = body ? safeParse(body) : {};
+  if (!envelope || typeof envelope !== "object") {
+    writeError(response, 400, "invalid_request", "body must be JSON object");
+    return;
+  }
+  const status = (envelope as { status?: unknown }).status;
+  if (!isAckStatus(status)) {
+    writeError(response, 400, "invalid_request", "status must be accepted, completed, failed, expired, or superseded");
+    return;
+  }
+  const result = (envelope as { result?: unknown }).result;
+  if (result !== undefined && !isRecord(result)) {
+    writeError(response, 400, "invalid_request", "result must be an object");
+    return;
+  }
+  const error = (envelope as { error?: unknown }).error;
+  if (error !== undefined && typeof error !== "string") {
+    writeError(response, 400, "invalid_request", "error must be a string");
+    return;
+  }
+
+  const details: { result?: Record<string, unknown>; error?: string } = {};
+  if (isRecord(result)) details.result = result;
+  if (typeof error === "string") details.error = error;
+  writeJSON(response, 200, store.ackRequest(requestId, status, details));
+}
+
+function handleListPresence(
+  store: RelayStore,
+  request: IncomingMessage,
+  response: ServerResponse,
+  url: ParsedURL,
+): void {
+  const auth = authenticate(store, request);
+  if (!auth.ok) {
+    writeError(response, auth.status, auth.code, auth.message);
+    return;
+  }
+  const deviceId = url.query.get("deviceId");
+  if (deviceId) {
+    const presence = store.getPresenceForUser(auth.device.userId, deviceId);
+    writeJSON(response, 200, { presence: presence ?? null });
+    return;
+  }
+  writeJSON(response, 200, { presence: store.listPresenceForUser(auth.device.userId) });
 }
 
 async function handleHeartbeat(
@@ -357,4 +549,28 @@ function writeError(response: ServerResponse, status: number, code: string, mess
     ok: false,
     error: { code, message, retryable: status >= 500 },
   });
+}
+
+function requestIdFromAckPath(path: string): string | null {
+  const parts = path.split("/");
+  if (parts.length !== 5 || parts[1] !== "v1" || parts[2] !== "requests" || parts[4] !== "ack") {
+    return null;
+  }
+  return parts[3] ? decodeURIComponent(parts[3]) : null;
+}
+
+function isAckStatus(value: unknown): value is Exclude<RequestStatus, "queued"> {
+  return value === "accepted" ||
+    value === "completed" ||
+    value === "failed" ||
+    value === "expired" ||
+    value === "superseded";
+}
+
+function isSensitivity(value: unknown): value is "none" | "preview" | "private" | "secret" {
+  return value === "none" || value === "preview" || value === "private" || value === "secret";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }

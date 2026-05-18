@@ -5,6 +5,7 @@
 // mutations.
 
 import Foundation
+import KiriFriendsCore
 
 public actor BridgeService {
     public struct Configuration: Sendable {
@@ -32,6 +33,7 @@ public actor BridgeService {
 
     private let configuration: Configuration
     private let server: HTTPServer
+    private var pendingRequestTask: Task<Void, Never>?
 
     public init(
         configuration: Configuration = Configuration(),
@@ -65,15 +67,106 @@ public actor BridgeService {
 
     public func start() async throws {
         try await server.start()
+        startPendingRequestLoop()
     }
 
     public func stop() async {
+        pendingRequestTask?.cancel()
+        pendingRequestTask = nil
         await server.stop()
     }
 
     public func boundPort() async -> UInt16? {
         await server.boundPort()
     }
+
+    public func processPendingRequestsForTesting() async {
+        await processPendingRequestsOnce()
+    }
+
+    private func startPendingRequestLoop() {
+        pendingRequestTask?.cancel()
+        pendingRequestTask = Task { [weak self, relay, interval = configuration.relay.pendingPollInterval] in
+            while !Task.isCancelled {
+                await self?.processPendingRequestsOnce()
+                try? await Task.sleep(for: interval)
+            }
+            _ = relay
+        }
+    }
+
+    private func processPendingRequestsOnce() async {
+        let requests = await relay.pendingRequests()
+        for request in requests {
+            await handlePendingRequest(request)
+        }
+    }
+
+    private func handlePendingRequest(_ request: RelayPendingRequest) async {
+        await relay.acknowledge(requestId: request.requestId, status: .accepted)
+        do {
+            let result = try await executePendingRequest(request)
+            await relay.acknowledge(requestId: request.requestId, status: .completed, result: result)
+        } catch {
+            await relay.acknowledge(requestId: request.requestId, status: .failed, error: "\(error)")
+        }
+    }
+
+    private func executePendingRequest(_ request: RelayPendingRequest) async throws -> PluginEventPayload {
+        switch request.kind {
+        case WatchActionKind.statusRefresh.rawValue:
+            let snapshot = await store.currentSnapshot()
+            return PluginEventPayload(values: [
+                "displayState": .string(snapshot.displayState.rawValue),
+                "sessions": .int(snapshot.sessions.count),
+            ])
+        case WatchActionKind.approvalAllow.rawValue, WatchActionKind.approvalDeny.rawValue:
+            let agent = await resolveAgent(for: request)
+            await store.setPermissionLocked(false)
+            _ = await store.apply(event: MacBuddyStateEvent(
+                agent: agent,
+                sessionId: request.sessionId ?? request.payload["sessionId"]?.stringValue ?? "default",
+                event: "WatchAction/\(request.kind)",
+                resolvedState: request.kind == WatchActionKind.approvalAllow.rawValue ? .attention : .idle
+            ))
+            return PluginEventPayload(values: [
+                "decision": .string(request.kind == WatchActionKind.approvalAllow.rawValue ? "allow" : "deny"),
+            ])
+        case WatchActionKind.taskStop.rawValue:
+            let agent = await resolveAgent(for: request)
+            await store.clearSession(BuddySessionKey(
+                agent: agent,
+                sessionId: request.sessionId ?? request.payload["sessionId"]?.stringValue ?? "default"
+            ))
+            return PluginEventPayload(values: ["stopped": .bool(true)])
+        case WatchActionKind.promptSendQuick.rawValue:
+            let text = request.payload["text"]?.stringValue ?? request.payload["prompt"]?.stringValue ?? ""
+            return PluginEventPayload(values: [
+                "queued": .bool(!text.isEmpty),
+                "text": .string(text),
+            ])
+        default:
+            throw BridgePendingRequestError.unsupportedKind(request.kind)
+        }
+    }
+
+    private func resolveAgent(for request: RelayPendingRequest) async -> AgentIdentifier {
+        if let raw = request.payload["tool"]?.stringValue ?? request.payload["agent"]?.stringValue,
+           let agent = AgentIdentifier(rawValue: raw) {
+            return agent
+        }
+        if let sessionId = request.sessionId ?? request.payload["sessionId"]?.stringValue {
+            let snapshot = await store.currentSnapshot()
+            if let match = snapshot.sessions.first(where: { $0.key.sessionId == sessionId }) {
+                return match.key.agent
+            }
+        }
+        return .claudeCode
+    }
+}
+
+private enum BridgePendingRequestError: Error, Sendable {
+    case unsupportedKind(String)
 }
 
 /// Per-route context. Kept as a struct so the captured closure remains

@@ -130,7 +130,13 @@ let package = Package(
         ),
         .testTarget(
             name: "KiriFriendsCoreTests",
-            dependencies: ["KiriFriendsCore", "KiriFriendsWatchKit", "KiriFriendsBridge"],
+            dependencies: [
+                "KiriFriendsCore",
+                "KiriFriendsWatchKit",
+                "KiriFriendsBridge",
+                "KiriFriendsPhoneApp",
+                "KiriFriendsWidgets",
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]

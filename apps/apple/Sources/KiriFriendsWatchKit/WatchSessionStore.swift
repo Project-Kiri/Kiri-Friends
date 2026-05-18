@@ -1,9 +1,11 @@
 import Foundation
 import KiriFriendsCore
+import Observation
 
 #if canImport(WatchConnectivity)
 import WatchConnectivity
 
+@Observable
 public final class WatchSessionStore: NSObject {
     public private(set) var snapshot: StateSnapshot
     public private(set) var buddySettings: BuddySettings?
@@ -18,7 +20,7 @@ public final class WatchSessionStore: NSObject {
     ) {
         self.session = session
         self.cache = cache
-        self.snapshot = cache.loadSnapshot() ?? .placeholder
+        self.snapshot = cache.loadRuntimeSnapshot() ?? .empty
         super.init()
     }
 
@@ -88,6 +90,7 @@ extension WatchSessionStore: WCSessionDelegate {
         error: Error?
     ) {
         lastErrorDescription = error?.localizedDescription
+        ingest(applicationContext: session.receivedApplicationContext)
     }
 
     public func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
@@ -97,6 +100,14 @@ extension WatchSessionStore: WCSessionDelegate {
     public func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
         ingest(applicationContext: userInfo)
     }
+
+    #if os(iOS)
+    public func sessionDidBecomeInactive(_ session: WCSession) {}
+
+    public func sessionDidDeactivate(_ session: WCSession) {
+        session.activate()
+    }
+    #endif
 }
 #else
 public final class WatchSessionStore {
@@ -108,7 +119,7 @@ public final class WatchSessionStore {
 
     public init(cache: WatchStateCache = WatchStateCache()) {
         self.cache = cache
-        self.snapshot = cache.loadSnapshot() ?? .placeholder
+        self.snapshot = cache.loadRuntimeSnapshot() ?? .empty
     }
 
     public func activate() {}
@@ -147,6 +158,15 @@ public struct WatchStateCache {
     public func loadSnapshot() -> StateSnapshot? {
         guard let data = defaults.data(forKey: key) else { return nil }
         return try? KiriJSON.decoder.decode(StateSnapshot.self, from: data)
+    }
+
+    public func loadRuntimeSnapshot() -> StateSnapshot? {
+        guard let snapshot = loadSnapshot() else { return nil }
+        if snapshot == .placeholder {
+            defaults.removeObject(forKey: key)
+            return nil
+        }
+        return snapshot
     }
 
     public func save(_ snapshot: StateSnapshot) {

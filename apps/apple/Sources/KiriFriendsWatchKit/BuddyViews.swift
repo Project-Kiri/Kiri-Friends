@@ -24,28 +24,32 @@ public struct BuddyHomeView: View {
             for: snapshot,
             isLuminanceReduced: isLuminanceReduced
         )
+        let pendingOptions = PendingWatchActionOption.options(for: snapshot)
 
+        // Keep the layout glanceable per watchos-design-guidelines W-GL-01:
+        // buddy art, one summary line, and the primary action must fit the
+        // first screen. ScrollView remains so accessibility text sizes can
+        // still grow without clipping the action.
         ScrollView {
-            VStack(spacing: 10) {
+            VStack(spacing: 4) {
                 BuddyStageView(
                     presentation: presentation,
                     theme: theme,
-                    reduceMotion: reduceMotion
+                    reduceMotion: reduceMotion,
+                    stageSize: pendingOptions.isEmpty ? 132 : 112
                 )
                 BuddySpeechBubble(line: presentation.speech, redactsText: isLuminanceReduced)
                 ConnectionBadgeView(connectionState: snapshot.connectionState)
 
-                if let action = presentation.primaryAction {
-                    Button(primaryActionTitle(for: action)) {
-                        playHaptic(for: action)
-                        sendAction(makeAction(action))
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .primaryHandGesture(isEnabled: action == .approvalAllow && snapshot.approval?.sensitivity != .private)
-                    .accessibilityHint(primaryActionHint(for: action))
+                PendingActionStrip(options: pendingOptions) { action in
+                    playHaptic(for: action)
+                    sendAction(makeAction(action))
                 }
+                .accessibilityHidden(presentation.primaryAction == nil)
             }
-            .padding()
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .offset(y: pendingOptions.isEmpty ? 0 : -26)
         }
     }
 
@@ -56,36 +60,6 @@ public struct BuddyHomeView: View {
             approvalId: snapshot.approval?.id,
             createdAt: .now
         )
-    }
-
-    private func primaryActionTitle(for action: WatchActionKind) -> String {
-        switch action {
-        case .approvalAllow:
-            return "Approve"
-        case .approvalDeny:
-            return "Deny"
-        case .taskStop:
-            return "Stop"
-        case .promptSendQuick:
-            return "Reply"
-        case .statusRefresh:
-            return "Refresh"
-        }
-    }
-
-    private func primaryActionHint(for action: WatchActionKind) -> String {
-        switch action {
-        case .approvalAllow:
-            return "Approves the current CLI action."
-        case .approvalDeny:
-            return "Denies the current CLI action."
-        case .taskStop:
-            return "Stops the current CLI task."
-        case .promptSendQuick:
-            return "Sends a quick reply to the active session."
-        case .statusRefresh:
-            return "Requests the latest CLI status."
-        }
     }
 
     private func playHaptic(for action: WatchActionKind) {
@@ -104,39 +78,39 @@ public struct BuddyStageView: View {
     let presentation: BuddyPresentation
     let theme: BundledBuddyTheme
     let reduceMotion: Bool
+    let stageSize: CGFloat
 
     @State private var isBreathing = false
 
     public init(
         presentation: BuddyPresentation,
         theme: BundledBuddyTheme = BundledBuddyThemeRegistry.defaultTheme,
-        reduceMotion: Bool = false
+        reduceMotion: Bool = false,
+        stageSize: CGFloat = 104
     ) {
         self.presentation = presentation
         self.theme = theme
         self.reduceMotion = reduceMotion
+        self.stageSize = stageSize
     }
 
     public var body: some View {
-        VStack(spacing: 6) {
-            stageImage
-                .frame(width: 96, height: 96)
-                .scaleEffect(reduceMotion ? 1 : (isBreathing ? scale : 1.0))
-                .animation(
-                    reduceMotion
-                        ? nil
-                        : .easeInOut(duration: 1.6).repeatForever(autoreverses: true),
-                    value: isBreathing
-                )
-                .onAppear { isBreathing = true }
-                .accessibilityHidden(true)
-
-            Text(presentation.state.rawValue.capitalized)
-                .font(.headline)
-                .lineLimit(1)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Kiri is \(presentation.state.rawValue)")
+        // The buddy expression communicates the persona state visually, so
+        // we deliberately omit the raw "Attention/Running/..." caption per
+        // watchos-design-guidelines W-GL-04 and the project copy rule about
+        // redundant text. VoiceOver still announces the state.
+        stageImage
+            .frame(width: stageSize, height: stageSize)
+            .scaleEffect(reduceMotion ? 1 : (isBreathing ? scale : 1.0))
+            .animation(
+                reduceMotion
+                    ? nil
+                    : .easeInOut(duration: 1.6).repeatForever(autoreverses: true),
+                value: isBreathing
+            )
+            .onAppear { isBreathing = true }
+            .accessibilityElement()
+            .accessibilityLabel("Kiri is \(presentation.state.rawValue)")
     }
 
     @ViewBuilder
@@ -149,9 +123,13 @@ public struct BuddyStageView: View {
                 .resizable()
                 .interpolation(.none)
                 .aspectRatio(contentMode: .fit)
+                // The imported desktop sprites carry substantial transparent
+                // padding; zoom them in so the character is the primary Watch
+                // visual instead of a small icon inside the asset canvas.
+                .scaleEffect(assetZoom)
         } else {
             Image(systemName: BuddyStageAssetResolver.symbolFallback(for: presentation.state))
-                .font(.system(size: 54))
+                .font(.system(size: stageSize * 0.68))
         }
     }
 
@@ -163,6 +141,17 @@ public struct BuddyStageView: View {
             return 1.04
         default:
             return 1.02
+        }
+    }
+
+    private var assetZoom: CGFloat {
+        switch theme.namespace {
+        case "clawd":
+            return 1.42
+        case "cloudling":
+            return 1.15
+        default:
+            return 1.25
         }
     }
 }
@@ -226,47 +215,35 @@ public struct ConnectionBadgeView: View {
     }
 
     public var body: some View {
-        Label(title, systemImage: symbol)
-            .font(.caption2)
-            .foregroundStyle(color)
-            .lineLimit(1)
+        // Only surface the badge when something is wrong. A connected state
+        // is the expected baseline; showing a row that says "Relay connected"
+        // duplicates the buddy's idle expression and steals first-screen
+        // real estate from the primary action.
+        if let copy = problem {
+            Label(copy.title, systemImage: copy.symbol)
+                .font(.caption2)
+                .foregroundStyle(.orange)
+                .lineLimit(1)
+        }
     }
 
-    private var title: String {
+    private struct ProblemCopy {
+        var title: String
+        var symbol: String
+    }
+
+    private var problem: ProblemCopy? {
         switch connectionState {
         case .relayConnected:
-            return "Relay connected"
+            return nil
         case .relayUnavailable:
-            return "Relay unavailable"
+            return ProblemCopy(title: "Relay unavailable", symbol: "exclamationmark.circle")
         case .macOffline:
-            return "CLI host offline"
+            return ProblemCopy(title: "CLI host offline", symbol: "exclamationmark.circle")
         case .iphoneUnreachable:
-            return "iPhone unreachable"
+            return ProblemCopy(title: "iPhone unreachable", symbol: "exclamationmark.circle")
         case .unknown:
-            return "Unknown"
+            return ProblemCopy(title: "Connecting", symbol: "wifi.exclamationmark")
         }
-    }
-
-    private var symbol: String {
-        connectionState == .relayConnected ? "checkmark.circle.fill" : "exclamationmark.circle"
-    }
-
-    private var color: Color {
-        connectionState == .relayConnected ? .green : .orange
-    }
-}
-
-private extension View {
-    @ViewBuilder
-    func primaryHandGesture(isEnabled: Bool) -> some View {
-        #if os(watchOS)
-        if #available(watchOS 11.0, *) {
-            self.handGestureShortcut(.primaryAction, isEnabled: isEnabled)
-        } else {
-            self
-        }
-        #else
-        self
-        #endif
     }
 }

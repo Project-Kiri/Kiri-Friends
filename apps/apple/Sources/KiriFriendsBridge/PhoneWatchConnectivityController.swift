@@ -51,7 +51,15 @@ public final class PhoneWatchConnectivityController: NSObject {
             pendingContext = merged
             return merged
         }
+        guard session.activationState == .activated else { return }
         try session.updateApplicationContext(next)
+    }
+
+    private func flushPendingContextIfActivated() {
+        guard session.activationState == .activated else { return }
+        let context = contextLock.withLock { pendingContext }
+        guard !context.isEmpty else { return }
+        try? session.updateApplicationContext(context)
     }
 }
 
@@ -68,9 +76,19 @@ extension PhoneWatchConnectivityController: WCSessionDelegate {
         _ session: WCSession,
         activationDidCompleteWith activationState: WCSessionActivationState,
         error: Error?
-    ) {}
+    ) {
+        flushPendingContextIfActivated()
+    }
 
     #if os(iOS)
+    public func sessionWatchStateDidChange(_ session: WCSession) {
+        flushPendingContextIfActivated()
+    }
+
+    public func sessionReachabilityDidChange(_ session: WCSession) {
+        flushPendingContextIfActivated()
+    }
+
     public func sessionDidBecomeInactive(_ session: WCSession) {}
 
     public func sessionDidDeactivate(_ session: WCSession) {

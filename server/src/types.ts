@@ -69,18 +69,26 @@ export type RelayRequest = {
   sessionId?: string;
   kind: string;
   createdAt: string;
+  updatedAt: string;
+  acknowledgedAt?: string;
+  completedAt?: string;
   expiresAt: string;
   idempotencyKey: string;
   payload: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  error?: string;
   status: RequestStatus;
 };
 
 export type RelayEvent = {
   eventId: string;
+  version?: 1;
   userId: string;
   sourceDeviceId: string;
+  tool?: string;
   event: string;
   sessionId?: string;
+  cwd?: string;
   createdAt: string;
   payload: Record<string, unknown>;
   sensitivity: "none" | "preview" | "private" | "secret";

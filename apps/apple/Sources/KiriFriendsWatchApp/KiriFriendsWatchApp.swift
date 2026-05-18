@@ -24,8 +24,7 @@ struct ContentView: View {
             StatusView(
                 snapshot: watchStore.snapshot,
                 theme: activeTheme,
-                sendAction: watchStore.sendAction,
-                onAdditionalSessionsTapped: { /* TabView handles selection externally */ }
+                sendAction: watchStore.sendAction
             )
             .tabItem { Label("Status", systemImage: "waveform") }
 
@@ -42,7 +41,11 @@ struct ContentView: View {
             )
             .tabItem { Label("Commands", systemImage: "command") }
 
-            SettingsView(snapshot: watchStore.snapshot, buddySettings: watchStore.buddySettings)
+            SettingsView(
+                snapshot: watchStore.snapshot,
+                buddySettings: watchStore.buddySettings,
+                sendHealthSummary: watchStore.sendHealthSummary
+            )
                 .tabItem { Label("Settings", systemImage: "gear") }
         }
         .onAppear {
@@ -61,23 +64,14 @@ struct StatusView: View {
     let snapshot: StateSnapshot
     let theme: BundledBuddyTheme
     let sendAction: (WatchAction) -> Void
-    let onAdditionalSessionsTapped: () -> Void
 
     var body: some View {
-        VStack(spacing: 8) {
-            if let tool = snapshot.session?.tool {
-                Label(tool.displayName, systemImage: tool.symbolName)
-                    .font(.caption.weight(.semibold))
-                    .symbolRenderingMode(.hierarchical)
-            }
-            BuddyHomeView(snapshot: snapshot, theme: theme, sendAction: sendAction)
-            if snapshot.additionalSessionCount > 0 {
-                Text("+\(snapshot.additionalSessionCount) other sessions")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .onTapGesture(perform: onAdditionalSessionsTapped)
-            }
-        }
+        // Status is intentionally just the buddy stage. The agent label,
+        // explicit state text, "Relay connected" badge, and "+N sessions"
+        // hint were removed so the primary action fits the first screen
+        // (watchos-design-guidelines W-GL-01 / W-NV-05). Per-agent context
+        // and additional sessions live one swipe away on the Sessions tab.
+        BuddyHomeView(snapshot: snapshot, theme: theme, sendAction: sendAction)
     }
 }
 
@@ -157,22 +151,21 @@ struct CommandsView: View {
             if !snapshot.sessions.isEmpty {
                 sessionPicker
             }
+            actionButtons
+        }
+    }
 
-            Button("Refresh") {
-                send(.statusRefresh)
-            }
-            Button("Stop Task") {
-                send(.taskStop)
-            }
-            .disabled(targetSession?.state != .running)
-            Button("Approve") {
-                send(.approvalAllow)
-            }
-            .disabled(targetSession?.state != .waitingForApproval)
-            Button("Deny") {
-                send(.approvalDeny)
-            }
-            .disabled(targetSession?.state != .waitingForApproval)
+    @ViewBuilder
+    private var actionButtons: some View {
+        let options = PendingWatchActionOption.options(for: snapshot, targetSession: targetSession)
+        if options.isEmpty {
+            Text("No actions pending")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .listRowBackground(Color.clear)
+        } else {
+            PendingActionStrip(options: options, sendAction: send)
         }
     }
 
@@ -214,6 +207,9 @@ struct CommandsView: View {
 struct SettingsView: View {
     let snapshot: StateSnapshot
     let buddySettings: BuddySettings?
+    let sendHealthSummary: (HealthSignalSummary) -> Void
+
+    @State private var healthStatus: String?
 
     private var activeThemeName: String {
         BundledBuddyThemeRegistry
@@ -232,6 +228,31 @@ struct SettingsView: View {
                 LabeledContent("Buddy", value: buddySettings.buddyName)
                 LabeledContent("Preview", value: buddySettings.showsPreviewText ? "on" : "off")
             }
+            Button("Send Health Summary") {
+                Task { await sendCurrentHealthSummary() }
+            }
+            if let healthStatus {
+                Text(healthStatus)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
         }
+    }
+
+    private func sendCurrentHealthSummary() async {
+        #if canImport(HealthKit)
+        let provider = HealthSignalProvider()
+        do {
+            try await provider.requestAuthorization()
+            let summary = await provider.currentSummary()
+            sendHealthSummary(summary)
+            healthStatus = "Health summary sent"
+        } catch {
+            healthStatus = "Health data unavailable"
+        }
+        #else
+        sendHealthSummary(.placeholder)
+        healthStatus = "Health summary sent"
+        #endif
     }
 }

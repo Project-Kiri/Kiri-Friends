@@ -5,6 +5,7 @@ import { claudeContinueOutput, claudeLifecycleEvent } from "../src/claude.js";
 import { CLIHostBridge } from "../src/cli-host-bridge.js";
 import { codexLifecycleEvent, codexPermissionEvent, handleCodexPermissionRequest } from "../src/codex.js";
 import { addJsonHookEntry, removeKiriEntries } from "../src/installer.js";
+import { resolveBridgeTargets } from "../src/local-bridge-client.js";
 import { resolveOpenCodeConfigDir } from "../src/opencode.js";
 import { redactPayload } from "../src/redaction.js";
 import type { BridgeClient } from "../src/types.js";
@@ -119,6 +120,24 @@ test("installer preserves non-Kiri hook entries", () => {
   assert.equal(installed.hooks.PreToolUse[1].hooks[0].marker, undefined);
   assert.equal(parsed.hooks.PreToolUse.length, 1);
   assert.equal(parsed.hooks.PreToolUse[0].hooks[0].command, "echo user");
+});
+
+test("local bridge target resolution follows explicit runtime and fallback order", () => {
+  const targets = resolveBridgeTargets({
+    host: "127.0.0.1",
+    explicitPort: 9000,
+    runtime: { host: "localhost", port: 9001, ports: [9002, 9000] },
+    env: { KIRI_BRIDGE_PORT: "9003" },
+    portCandidates: [7474, 9002],
+  });
+
+  assert.deepEqual(targets, [
+    { host: "localhost", port: 9000 },
+    { host: "localhost", port: 9003 },
+    { host: "localhost", port: 9001 },
+    { host: "localhost", port: 9002 },
+    { host: "localhost", port: 7474 },
+  ]);
 });
 
 test("CLI host bridge forwards lifecycle events without a decision", async () => {

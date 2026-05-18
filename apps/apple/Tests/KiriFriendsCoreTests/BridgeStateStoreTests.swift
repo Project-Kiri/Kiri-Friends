@@ -81,6 +81,28 @@ struct BridgeStateStoreFoldingTests {
         #expect(store.lastEventId == "evt-42")
     }
 
+    @MainActor
+    @Test("Top-level relay tool drives session identity")
+    func topLevelRelayToolDrivesSessionIdentity() {
+        let store = BridgeStateStore(latestSnapshot: emptySnapshot())
+        store.apply(event: RelayEventEnvelope(
+            eventId: "evt-top-level-tool",
+            version: 1,
+            userId: "user-1",
+            sourceDeviceId: "device-mac",
+            tool: "codex",
+            event: "approval.requested",
+            sessionId: "codex-1",
+            cwd: "/tmp/project",
+            createdAt: Date(),
+            payload: ["summary": .string("Run tests")]
+        ))
+
+        #expect(store.latestSnapshot.session?.tool == .codex)
+        #expect(store.latestSnapshot.session?.state == .waitingForApproval)
+        #expect(store.latestSnapshot.session?.summary == "Run tests")
+    }
+
     private func emptySnapshot() -> StateSnapshot {
         StateSnapshot(
             updatedAt: Date(timeIntervalSince1970: 0),
@@ -169,6 +191,29 @@ struct BridgeRuntimeTests {
         let sentRequests = await downlink.sentRequests
         #expect(sentRequests.count == 1)
         #expect(sentRequests.first?.kind == "approval.allow")
+    }
+
+    @MainActor
+    @Test("Health summary is gated by sharing setting")
+    func healthSummarySharingIsGated() {
+        let runtime = BridgeRuntime(
+            store: BridgeStateStore(latestSnapshot: emptySnapshot()),
+            client: InMemoryRelayDownlinkClient(),
+            watchController: nil,
+            appGroupStore: nil,
+            userId: "user-1",
+            macDeviceId: "mac-1"
+        )
+
+        runtime.handleHealthSummaryForTesting(.placeholder)
+        #expect(runtime.store.latestSnapshot.healthSummary == nil)
+
+        runtime.setSharesHealthContext(true)
+        runtime.handleHealthSummaryForTesting(.placeholder)
+        #expect(runtime.store.latestSnapshot.healthSummary == .placeholder)
+
+        runtime.setSharesHealthContext(false)
+        #expect(runtime.store.latestSnapshot.healthSummary == nil)
     }
 
     private func emptySnapshot() -> StateSnapshot {

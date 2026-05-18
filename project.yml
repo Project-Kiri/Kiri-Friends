@@ -38,6 +38,7 @@ targets:
         LSRequiresIPhoneOS: true
         NSHealthShareUsageDescription: Kiri uses coarse wellness summaries to adjust buddy behavior when you allow it.
         NSHealthUpdateUsageDescription: Kiri does not write health data.
+        UILaunchStoryboardName: LaunchScreen
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
@@ -49,6 +50,10 @@ targets:
         product: KiriFriendsCore
       - package: KiriFriendsApple
         product: KiriFriendsBridge
+      - package: KiriFriendsApple
+        product: KiriFriendsWatchKit
+      - target: KiriFriendsWatchApp
+        embed: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.kirifriends.phone
@@ -71,7 +76,8 @@ targets:
         NSHealthShareUsageDescription: Kiri uses coarse wellness summaries to adjust buddy behavior when you allow it.
         NSHealthUpdateUsageDescription: Kiri does not write health data.
         WKApplication: true
-        WKWatchOnly: true
+        WKCompanionAppBundleIdentifier: com.kirifriends.phone
+        WKWatchOnly: false
         WKSupportsAlwaysOnDisplay: true
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
@@ -84,7 +90,7 @@ targets:
         product: KiriFriendsWatchKit
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.kirifriends.watchapp
+        PRODUCT_BUNDLE_IDENTIFIER: com.kirifriends.phone.watchapp
         MARKETING_VERSION: "0.1.0"
         CURRENT_PROJECT_VERSION: "1"
         INFOPLIST_FILE: apps/apple/Configuration/KiriFriendsWatchApp-Info.plist

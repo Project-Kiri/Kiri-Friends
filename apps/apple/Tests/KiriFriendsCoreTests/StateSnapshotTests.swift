@@ -51,6 +51,46 @@ import Testing
     #expect(presentation.speech.text == "Run tests")
 }
 
+@Test func primaryActionOnlyExistsForHookDrivenStates() {
+    let states: [(SessionState, WatchActionKind?)] = [
+        (.waitingForApproval, .approvalAllow),
+        (.waitingForInput, .promptSendQuick),
+        (.running, nil),
+        (.idle, nil),
+        (.completed, nil),
+        (.failed, nil),
+        (.unknown, nil),
+    ]
+
+    for (state, expected) in states {
+        let snapshot = StateSnapshot(
+            updatedAt: Date(timeIntervalSince1970: 0),
+            activeTool: .codex,
+            connectionState: .relayConnected,
+            session: CLISessionSummary(
+                id: "s-\(state.rawValue)",
+                state: state,
+                title: "Codex",
+                summary: "",
+                sensitivity: .none,
+                tool: .codex
+            )
+        )
+        let presentation = BuddyPresentationReducer.presentation(for: snapshot)
+        #expect(presentation.primaryAction == expected, "state \(state.rawValue) should map to \(String(describing: expected))")
+    }
+}
+
+@Test func primaryActionIsNilWhenNoSession() {
+    let snapshot = StateSnapshot(
+        updatedAt: Date(timeIntervalSince1970: 0),
+        activeTool: .unknown,
+        connectionState: .relayConnected,
+        session: nil
+    )
+    #expect(BuddyPresentationReducer.presentation(for: snapshot).primaryAction == nil)
+}
+
 @Test func derivesComplicationSnapshotWithoutPrivateText() {
     let complication = BuddyPresentationReducer.complicationSnapshot(for: .placeholder)
 

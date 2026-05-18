@@ -8,6 +8,8 @@ import Foundation
 
 public protocol RelayTransport: Sendable {
     func post(envelope: PluginEventEnvelope) async throws
+    func pendingRequests() async throws -> [RelayPendingRequest]
+    func acknowledge(requestId: String, status: RelayRequestStatus, result: PluginEventPayload?, error: String?) async throws
 }
 
 public struct NullRelayTransport: RelayTransport {
@@ -16,6 +18,46 @@ public struct NullRelayTransport: RelayTransport {
         // No-op transport used when the relay base URL has not been
         // configured. Keeps the bridge testable without a remote endpoint.
     }
+    public func pendingRequests() async throws -> [RelayPendingRequest] { [] }
+    public func acknowledge(requestId _: String, status _: RelayRequestStatus, result _: PluginEventPayload?, error _: String?) async throws {}
+}
+
+public enum RelayRequestStatus: String, Codable, Sendable, Hashable {
+    case accepted
+    case completed
+    case failed
+    case expired
+    case superseded
+}
+
+public struct RelayPendingRequest: Codable, Sendable, Hashable, Identifiable {
+    public var requestId: String
+    public var targetDeviceId: String
+    public var sessionId: String?
+    public var kind: String
+    public var expiresAt: String
+    public var idempotencyKey: String
+    public var payload: PluginEventPayload
+
+    public var id: String { requestId }
+
+    public init(
+        requestId: String,
+        targetDeviceId: String,
+        sessionId: String? = nil,
+        kind: String,
+        expiresAt: String,
+        idempotencyKey: String,
+        payload: PluginEventPayload = PluginEventPayload()
+    ) {
+        self.requestId = requestId
+        self.targetDeviceId = targetDeviceId
+        self.sessionId = sessionId
+        self.kind = kind
+        self.expiresAt = expiresAt
+        self.idempotencyKey = idempotencyKey
+        self.payload = payload
+    }
 }
 
 public actor RelayUplinkClient {
@@ -23,11 +65,18 @@ public actor RelayUplinkClient {
         public var baseURL: URL?
         public var deviceToken: String?
         public var requestTimeout: TimeInterval
+        public var pendingPollInterval: Duration
 
-        public init(baseURL: URL? = nil, deviceToken: String? = nil, requestTimeout: TimeInterval = 8) {
+        public init(
+            baseURL: URL? = nil,
+            deviceToken: String? = nil,
+            requestTimeout: TimeInterval = 8,
+            pendingPollInterval: Duration = .seconds(2)
+        ) {
             self.baseURL = baseURL
             self.deviceToken = deviceToken
             self.requestTimeout = requestTimeout
+            self.pendingPollInterval = pendingPollInterval
         }
     }
 
@@ -65,6 +114,51 @@ public actor RelayUplinkClient {
         encoder.outputFormatting = [.sortedKeys]
         guard let body = try? encoder.encode(envelope) else { return }
         request.httpBody = body
+        _ = try? await session.data(for: request)
+    }
+
+    public func pendingRequests() async -> [RelayPendingRequest] {
+        if let transport {
+            return (try? await transport.pendingRequests()) ?? []
+        }
+        guard let baseURL = configuration.baseURL else { return [] }
+        var request = URLRequest(url: baseURL.appending(path: "v1/requests/pending"))
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let token = configuration.deviceToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        do {
+            let (data, _) = try await session.data(for: request)
+            struct Envelope: Decodable { var requests: [RelayPendingRequest] }
+            return try JSONDecoder().decode(Envelope.self, from: data).requests
+        } catch {
+            return []
+        }
+    }
+
+    public func acknowledge(
+        requestId: String,
+        status: RelayRequestStatus,
+        result: PluginEventPayload? = nil,
+        error: String? = nil
+    ) async {
+        if let transport {
+            try? await transport.acknowledge(requestId: requestId, status: status, result: result, error: error)
+            return
+        }
+        guard let baseURL = configuration.baseURL else { return }
+        var request = URLRequest(url: baseURL.appending(path: "v1/requests/\(requestId)/ack"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = configuration.deviceToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        struct AckBody: Encodable {
+            var status: RelayRequestStatus
+            var result: PluginEventPayload?
+            var error: String?
+        }
+        request.httpBody = try? JSONEncoder().encode(AckBody(status: status, result: result, error: error))
         _ = try? await session.data(for: request)
     }
 }

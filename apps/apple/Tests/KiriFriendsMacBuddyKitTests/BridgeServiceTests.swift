@@ -113,6 +113,26 @@ struct BridgeServiceTests {
         #expect(parsed?.isEmpty == true)
     }
 
+    @Test("Relay pending requests are accepted and completed")
+    func relayPendingRequestsAreProcessed() async {
+        let transport = PendingRequestTransport(requests: [
+            RelayPendingRequest(
+                requestId: "request-1",
+                targetDeviceId: "mac-1",
+                kind: "status.refresh",
+                expiresAt: "2026-05-18T12:00:00Z",
+                idempotencyKey: "status-refresh"
+            ),
+        ])
+        let bridge = BridgeService(configuration: testConfiguration(), relayTransport: transport)
+
+        await bridge.processPendingRequestsForTesting()
+
+        let acknowledgements = await transport.acknowledgements
+        #expect(acknowledgements.map(\.status) == [.accepted, .completed])
+        #expect(acknowledgements.last?.result?["displayState"]?.stringValue == "sleeping")
+    }
+
     @Test("Unknown route yields 404")
     func unknownRoute() async throws {
         let bridge = BridgeService(configuration: testConfiguration())
@@ -160,5 +180,31 @@ struct BridgeServiceTests {
         let (data, urlResponse) = try await URLSession.shared.data(from: url)
         let http = urlResponse as! HTTPURLResponse
         return HTTPClientResponse(statusCode: http.statusCode, body: data)
+    }
+}
+
+private actor PendingRequestTransport: RelayTransport {
+    struct Acknowledgement: Sendable {
+        var requestId: String
+        var status: RelayRequestStatus
+        var result: PluginEventPayload?
+        var error: String?
+    }
+
+    private let requests: [RelayPendingRequest]
+    private(set) var acknowledgements: [Acknowledgement] = []
+
+    init(requests: [RelayPendingRequest]) {
+        self.requests = requests
+    }
+
+    func post(envelope _: PluginEventEnvelope) async throws {}
+
+    func pendingRequests() async throws -> [RelayPendingRequest] {
+        acknowledgements.isEmpty ? requests : []
+    }
+
+    func acknowledge(requestId: String, status: RelayRequestStatus, result: PluginEventPayload?, error: String?) async throws {
+        acknowledgements.append(Acknowledgement(requestId: requestId, status: status, result: result, error: error))
     }
 }

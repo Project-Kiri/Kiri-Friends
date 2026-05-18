@@ -27,7 +27,7 @@ apps/apple/
     KiriFriendsWatchApp/       watchOS SwiftUI buddy app shell
     KiriFriendsWidgets/        WidgetKit complications and Smart Stack surfaces
     KiriFriendsBridge/         iPhone companion support code
-    KiriFriendsCLI/            Legacy CLI scaffold (placeholder; the Mac side now lives in Mac Buddy)
+    KiriFriendsCLI/            Diagnostics helper; the Mac bridge runtime lives in Mac Buddy
     KiriFriendsMacBuddyKit/    Mac Buddy domain library (AGPL-3.0)
     KiriFriendsBuddyMac/       Mac Buddy SwiftUI executable + bundled themes (AGPL-3.0)
   Tests/

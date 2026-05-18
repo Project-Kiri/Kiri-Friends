@@ -26,9 +26,11 @@
 	<string>Kiri does not write health data.</string>
 	<key>WKApplication</key>
 	<true/>
+	<key>WKCompanionAppBundleIdentifier</key>
+	<string>com.kirifriends.phone</string>
 	<key>WKSupportsAlwaysOnDisplay</key>
 	<true/>
 	<key>WKWatchOnly</key>
-	<true/>
+	<false/>
 </dict>
 </plist>

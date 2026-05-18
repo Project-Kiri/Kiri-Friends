@@ -28,6 +28,7 @@ public final class BridgeRuntime {
 
     private var streamTask: Task<Void, Never>?
     private var watchActionHandler: ((WatchAction) -> Void)?
+    private var sharesHealthContext: Bool
 
     public init(
         store: BridgeStateStore = BridgeStateStore(latestSnapshot: BridgeRuntime.emptySnapshot()),
@@ -45,6 +46,7 @@ public final class BridgeRuntime {
         self.userId = userId
         self.macDeviceId = macDeviceId
         self.approvalLifetime = approvalLifetime
+        self.sharesHealthContext = false
     }
 
     public static func emptySnapshot() -> StateSnapshot {
@@ -64,7 +66,15 @@ public final class BridgeRuntime {
                 self.handle(action: action)
             }
         }
+        watchController?.onReceivedHealthSummary = { [weak self] summary in
+            guard let self else { return }
+            Task { @MainActor in
+                self.handle(healthSummary: summary)
+            }
+        }
         streamTask?.cancel()
+        store.updateConnectionState(client.startupConnectionState)
+        publishSnapshot()
         let cursor = store.lastEventId
         let stream = client.streamEvents(since: cursor)
         streamTask = Task { @MainActor [weak self] in
@@ -97,6 +107,14 @@ public final class BridgeRuntime {
         try watchController?.syncBuddySettings(settings)
     }
 
+    public func setSharesHealthContext(_ enabled: Bool) {
+        sharesHealthContext = enabled
+        if !enabled {
+            store.updateHealthSummary(nil)
+            publishSnapshot()
+        }
+    }
+
     private func handle(action: WatchAction) {
         guard let macDeviceId else { return }
         let mapped = mapAction(action, macDeviceId: macDeviceId)
@@ -104,6 +122,12 @@ public final class BridgeRuntime {
             try? await client.sendRequest(mapped)
         }
         watchActionHandler?(action)
+    }
+
+    private func handle(healthSummary: HealthSignalSummary) {
+        guard sharesHealthContext else { return }
+        store.updateHealthSummary(healthSummary)
+        publishSnapshot()
     }
 
     private func mapAction(_ action: WatchAction, macDeviceId: String) -> RelayRequestEnvelope {
@@ -133,6 +157,10 @@ public final class BridgeRuntime {
     /// WatchConnectivity session.
     public func handleForTesting(action: WatchAction) {
         handle(action: action)
+    }
+
+    public func handleHealthSummaryForTesting(_ summary: HealthSignalSummary) {
+        handle(healthSummary: summary)
     }
 
     private func reloadWidgetTimelines() {

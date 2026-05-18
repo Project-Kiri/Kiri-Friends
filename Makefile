@@ -19,7 +19,7 @@ IPHONE_DESTINATION ?= generic/platform=iOS Simulator
 WATCH_DESTINATION ?= generic/platform=watchOS Simulator
 MAC_DESTINATION ?= generic/platform=macOS
 IPHONE_BUNDLE_ID ?= com.kirifriends.phone
-WATCH_BUNDLE_ID ?= com.kirifriends.watchapp
+WATCH_BUNDLE_ID ?= com.kirifriends.phone.watchapp
 MAC_BUNDLE_ID ?= com.kirifriends.buddy.mac
 
 .DEFAULT_GOAL := help
@@ -134,6 +134,10 @@ dev-server: ## Start Cloud Relay TypeScript dev watch mode.
 .PHONY: dev-relay
 dev-relay: ## Run the Cloud Relay HTTP server (127.0.0.1:8585 by default).
 	cd $(SERVER_DIR) && $(NPM) run start
+
+.PHONY: debug-relay
+debug-relay: ## Run the Cloud Relay debug CLI against an already-running relay.
+	cd $(SERVER_DIR) && $(NPM) run debug -- $(ARGS)
 
 .PHONY: verify-watch-assets
 verify-watch-assets: ## SHA-diff the Watch theme assets against KiriFriendsBuddyMac canonical files.

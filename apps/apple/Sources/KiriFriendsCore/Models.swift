@@ -205,6 +205,13 @@ public struct StateSnapshot: Codable, Hashable, Sendable {
         return others.count
     }
 
+    public static let empty = StateSnapshot(
+        updatedAt: Date(timeIntervalSince1970: 0),
+        activeTool: .unknown,
+        connectionState: .unknown,
+        session: nil
+    )
+
     public static let placeholder = StateSnapshot(
         updatedAt: Date(timeIntervalSince1970: 1_779_020_400),
         activeTool: .codex,
@@ -659,6 +666,14 @@ public struct ComplicationSnapshot: Codable, Hashable, Sendable {
         updatedAt: Date(timeIntervalSince1970: 1_779_020_400),
         shortStatus: "Approval",
         detail: "Kiri needs you",
+        symbolName: "sparkles",
+        sensitivity: .none
+    )
+
+    public static let empty = ComplicationSnapshot(
+        updatedAt: Date(timeIntervalSince1970: 0),
+        shortStatus: "Waiting",
+        detail: "Open Kiri",
         symbolName: "sparkles",
         sensitivity: .none
     )

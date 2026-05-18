@@ -124,9 +124,17 @@ Each queued item must include:
 - `sessionId` when session-scoped
 - `kind`
 - `createdAt`
+- `updatedAt`
 - `expiresAt`
 - `idempotencyKey`
 - `payload`
+
+The current HTTP implementation exposes device registration, pairing approval,
+event ingest, event listing, request enqueue, pending request listing,
+request acknowledgement/completion, heartbeat, and presence routes in
+`server/src/http-server.ts`. Event ingest stores the full normalized plugin
+envelope fields so the iPhone can fold multi-agent state from top-level
+`tool` without depending on duplicated payload fields.
 
 Expired requests are not delivered. The relay should emit an expiration event to the iPhone companion when the user needs feedback.
 
@@ -143,6 +151,41 @@ Acknowledgement states:
 - `superseded`: a newer request made this one irrelevant.
 
 The relay should distinguish transport delivery from CLI completion. A request can be delivered but still fail at the adapter layer.
+
+The bridge acknowledges delivery with `POST /v1/requests/:requestId/ack`.
+`accepted` records transport receipt, while `completed` and `failed` record
+the Mac bridge's execution result. Completion may include a structured result
+object; failures may include an error string. Expired requests are not returned
+from `/v1/requests/pending`.
+
+## Debug CLI
+
+Local relay testing uses an external debug CLI rather than unauthenticated
+server routes. The CLI talks to the same HTTP API as real clients, so it creates
+device tokens through registration, approves pairing through the iPhone role,
+ingests plugin events through the Mac role, and queues requests through the
+iPhone role.
+
+Typical flow:
+
+```sh
+cd server
+npm run debug -- seed --scenario approval-shell
+```
+
+The command prints `KIRI_RELAY_URL`, `KIRI_DEVICE_TOKEN`, `KIRI_USER_ID`, and
+`KIRI_MAC_DEVICE_ID` values that can be copied into the iPhone companion's
+relay configuration. Additional scenarios can be injected into the same relay:
+
+```sh
+npm run debug -- scenario waiting-input --mac-token <mac-token>
+npm run debug -- request prompt.sendQuick --iphone-token <iphone-token> --mac-device-id <mac-device-id>
+npm run debug -- ack <request-id> --mac-token <mac-token> --status completed
+```
+
+Supported scenarios live in `server/src/debug-scenarios.ts` and cover approval,
+input waiting, running, failed, and multi-agent states. Because the debug CLI is
+outside the server router, production deployments do not expose a debug bypass.
 
 ## Idempotency
 

@@ -61,9 +61,9 @@ flowchart LR
   BuddyMac -.->|Buddy window<br/>Permission bubble<br/>Session HUD<br/>Status bar| User[(User)]
 ```
 
-`KiriFriendsBuddyMac` is the single Mac-side process. It replaces the
-placeholder `KiriFriendsCLI` executable that previously stood in for the
-bridge.
+`KiriFriendsBuddyMac` is the single Mac-side process. The legacy
+`KiriFriendsCLI` executable is now only a small diagnostics helper; bridge
+runtime ownership lives in Mac Buddy.
 
 ## Module Map
 
@@ -90,7 +90,7 @@ bridge.
 | `Bridge/PluginEvent.swift` | Wire shape for `POST /v1/plugin-events`. |
 | `Bridge/LegacyStateRequest.swift` | Compatibility shape for `POST /state`. |
 | `Bridge/PermissionRequest.swift` | Wire shape for `POST /permission`. |
-| `Relay/RelayUplinkClient.swift` | Outbound Cloud Relay POST helper. |
+| `Relay/RelayUplinkClient.swift` | Outbound Cloud Relay client: plugin event uplink, pending request polling, and request acknowledgement. |
 | `Permission/PermissionBubbleService.swift` | Async-await bridge between the HTTP route and the bubble UI. |
 | `Permission/DoNotDisturbState.swift` | Centralised DND flag. |
 | `Theme/ThemeDescriptor.swift` | Schema for `theme.json` (mirror of upstream Clawd format). |
@@ -115,7 +115,7 @@ bridge.
 | `AppKit/System/StatusBarController.swift` | NSStatusItem with DND toggle, dashboard shortcut, Quit. |
 | `Theme/BuddyThemeAssets.swift` | Bundles the three bundled themes via `Bundle.module`. |
 | `BridgeAppModel.swift` | `@Observable` model exposing bridge status + display snapshot to SwiftUI. |
-| `Views/BuddyRootView.swift` | Settings scene placeholder showing bridge health. |
+| `Views/BuddyRootView.swift` | Settings status scene showing bridge health and current display state. |
 
 ## Phase Status
 
@@ -165,7 +165,7 @@ relay events it uplinks. The full data path is:
 
 ```mermaid
 flowchart LR
-  Buddy["KiriFriendsBuddyMac<br/>RelayUplinkClient"] -->|"POST /v1/plugin-events"| Relay["Cloud Relay HTTP<br/>server/src/http-server.ts"]
+  Buddy["KiriFriendsBuddyMac<br/>RelayUplinkClient"] -->|"POST /v1/plugin-events<br/>GET /v1/requests/pending<br/>POST /v1/requests/:id/ack"| Relay["Cloud Relay HTTP<br/>server/src/http-server.ts"]
   Relay -->|"GET /v1/events polling"| Runtime["iPhone BridgeRuntime<br/>HTTPRelayDownlinkClient"]
   Runtime --> Store["BridgeStateStore<br/>multi-session folding"]
   Store -->|"WC kind=state.snapshot"| Watch
@@ -183,6 +183,9 @@ flowchart LR
   dedicated Sessions tab. The Commands tab acts on whichever session is
   selected in Sessions, falling back to the priority-resolved primary
   session.
+- Watch-originated requests return through `/v1/requests/pending`; the
+  Mac bridge marks them `accepted`, applies supported actions to the
+  local state store, then sends `completed` or `failed`.
 - Complication snapshots include a `+N` suffix when the buddy is
   tracking additional sessions beyond the primary one.
 - The Watch renders the same theme art the Mac Buddy uses (Clawd /

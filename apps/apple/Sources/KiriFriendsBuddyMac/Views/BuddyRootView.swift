@@ -1,8 +1,6 @@
 // BuddyRootView.swift
-// Phase 1 placeholder: exposes bridge health (status + bound port + the
-// current MacBuddy display state) so a developer running `make dev-mac`
-// can verify the bridge is reachable. The Phase 2 transparent overlay
-// will replace this view entirely.
+// Settings status surface for bridge health, bound port, and the current
+// MacBuddy display state.
 
 import KiriFriendsCore
 import KiriFriendsMacBuddyKit

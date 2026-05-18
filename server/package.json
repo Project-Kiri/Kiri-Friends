@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "debug": "node --import tsx src/debug-cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
     "start": "node --import tsx src/server-entry.ts"

@@ -1,7 +1,7 @@
 // BridgeAppModel.swift
 // Top-level Observable that owns the bridge service for the SwiftUI app.
 // Tracks the bridge's bound port and the current display snapshot so the
-// Phase 0 placeholder view can surface the bridge's health to the user.
+// settings window can surface real bridge health to the user.
 
 import Foundation
 import KiriFriendsMacBuddyKit

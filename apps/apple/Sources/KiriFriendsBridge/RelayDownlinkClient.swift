@@ -1,11 +1,13 @@
 // RelayDownlinkClient.swift
 // Protocol abstraction for fetching events from Cloud Relay and posting
-// requests back upstream. Two implementations ship today:
+// requests back upstream. Three implementations ship today:
 //
 // - `HTTPRelayDownlinkClient` polls `/v1/events` over HTTPS for live
 //   deployments.
 // - `InMemoryRelayDownlinkClient` is a deterministic fake used by tests
-//   to drive `BridgeRuntime` without a real server.
+//   and explicit local-development runs.
+// - `RelayUnavailableDownlinkClient` represents a real unconfigured state;
+//   it never pretends to be connected.
 //
 // The event payload shape mirrors the `RelayEvent` returned by the
 // server's `/v1/events` route in `server/src/http-server.ts`.
@@ -15,10 +17,13 @@ import KiriFriendsCore
 
 public struct RelayEventEnvelope: Codable, Sendable, Hashable, Identifiable {
     public var eventId: String
+    public var version: Int?
     public var userId: String
     public var sourceDeviceId: String
+    public var tool: String?
     public var event: String
     public var sessionId: String?
+    public var cwd: String?
     public var createdAt: Date
     public var payload: [String: RelayValue]
     public var sensitivity: PayloadSensitivity
@@ -27,19 +32,25 @@ public struct RelayEventEnvelope: Codable, Sendable, Hashable, Identifiable {
 
     public init(
         eventId: String,
+        version: Int? = nil,
         userId: String,
         sourceDeviceId: String,
+        tool: String? = nil,
         event: String,
         sessionId: String? = nil,
+        cwd: String? = nil,
         createdAt: Date,
         payload: [String: RelayValue] = [:],
         sensitivity: PayloadSensitivity = .preview
     ) {
         self.eventId = eventId
+        self.version = version
         self.userId = userId
         self.sourceDeviceId = sourceDeviceId
+        self.tool = tool
         self.event = event
         self.sessionId = sessionId
+        self.cwd = cwd
         self.createdAt = createdAt
         self.payload = payload
         self.sensitivity = sensitivity
@@ -115,6 +126,8 @@ public indirect enum RelayValue: Codable, Sendable, Hashable {
 }
 
 public protocol RelayDownlinkClient: Sendable {
+    var startupConnectionState: ConnectionState { get }
+
     /// Streams events as they arrive. Implementations may poll, use SSE,
     /// or push from a local queue; the bridge only cares that events
     /// arrive in monotonic createdAt order.
@@ -124,9 +137,35 @@ public protocol RelayDownlinkClient: Sendable {
     func sendRequest(_ request: RelayRequestEnvelope) async throws
 }
 
+public struct RelayUnavailableDownlinkClient: RelayDownlinkClient {
+    public enum UnavailableError: Error, LocalizedError, Sendable {
+        case missingConfiguration
+
+        public var errorDescription: String? {
+            "Cloud Relay is not configured."
+        }
+    }
+
+    public var startupConnectionState: ConnectionState { .relayUnavailable }
+
+    public init() {}
+
+    public func streamEvents(since cursor: String?) -> AsyncStream<RelayEventEnvelope> {
+        AsyncStream { continuation in
+            continuation.finish()
+        }
+    }
+
+    public func sendRequest(_ request: RelayRequestEnvelope) async throws {
+        throw UnavailableError.missingConfiguration
+    }
+}
+
 // MARK: - In-memory implementation (tests)
 
 public actor InMemoryRelayDownlinkClient: RelayDownlinkClient {
+    public nonisolated var startupConnectionState: ConnectionState { .relayConnected }
+
     public private(set) var sentRequests: [RelayRequestEnvelope] = []
     private var continuations: [UUID: AsyncStream<RelayEventEnvelope>.Continuation] = [:]
     private var queue: [RelayEventEnvelope] = []
@@ -182,6 +221,8 @@ public actor InMemoryRelayDownlinkClient: RelayDownlinkClient {
 // MARK: - HTTP implementation
 
 public actor HTTPRelayDownlinkClient: RelayDownlinkClient {
+    public nonisolated var startupConnectionState: ConnectionState { .relayConnected }
+
     public struct Configuration: Sendable {
         public var baseURL: URL
         public var deviceToken: String

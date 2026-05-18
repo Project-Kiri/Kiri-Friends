@@ -20,15 +20,11 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>LSMinimumSystemVersion</key>
-	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
 	<true/>
-	<key>NSAppleEventsUsageDescription</key>
-	<string>Kiri Buddy uses Apple Events to focus your CLI terminal window when you tap an action from the buddy.</string>
 	<key>NSAccessibilityUsageDescription</key>
 	<string>Kiri Buddy uses Accessibility APIs to follow the active terminal and bring it forward when you act on a buddy notification.</string>
-	<key>NSHumanReadableCopyright</key>
-	<string>Copyright (c) 2026 Kiri Friends Contributors. Distributed under AGPL-3.0; see Sources/KiriFriendsBuddyMac/LICENSE.</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Kiri Buddy uses Apple Events to focus your CLI terminal window when you tap an action from the buddy.</string>
 </dict>
 </plist>

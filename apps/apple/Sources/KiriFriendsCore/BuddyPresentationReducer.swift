@@ -123,13 +123,18 @@ public enum BuddyPresentationReducer {
     }
 
     private static func primaryAction(for snapshot: StateSnapshot) -> WatchActionKind? {
+        // Only surface a button when a CLI hook actually needs a reply
+        // from the user. Idle / running / completed / failed states are
+        // informational; surfacing a generic "Refresh" or "Stop" button
+        // there would violate the project rule against placeholder actions
+        // and clutter the glanceable Status tab.
         switch snapshot.session?.state {
         case .waitingForApproval:
             return .approvalAllow
-        case .running:
-            return .taskStop
-        case .idle, .waitingForInput, .failed, .completed, .unknown, .none:
-            return .statusRefresh
+        case .waitingForInput:
+            return .promptSendQuick
+        case .running, .idle, .failed, .completed, .unknown, .none:
+            return nil
         }
     }
 

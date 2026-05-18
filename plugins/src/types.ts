@@ -36,6 +36,7 @@ export type PluginEventEnvelope = {
   cwd?: string;
   createdAt: string;
   payload: Record<string, unknown>;
+  sensitivity?: PayloadSensitivity;
 };
 
 export type BridgeDecision = {

@@ -174,15 +174,18 @@ Use higher relevance when:
 
 Use low or no relevance for idle state.
 
-## Placeholder and Snapshot
+## Placeholder and Runtime Fallback
 
-Placeholders should use realistic but generic data:
+WidgetKit gallery placeholders should use realistic but generic data:
 
 - Tool: `Kiri`
 - State: `Ready`
 - Summary: `CLI status`
 
-Never use empty placeholders or private sample text.
+Runtime fallbacks are different: when the App Group has no saved snapshot,
+the complication uses a neutral empty state such as `Waiting / Open Kiri`
+instead of a sample approval. Never show private sample text or mock approvals
+on the watch face.
 
 ## Testing Checklist
 

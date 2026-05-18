@@ -84,6 +84,21 @@ Coverage:
 
 Relay tests should distinguish delivery success from CLI completion success.
 
+The server package includes an external debug CLI for manual relay testing. It
+must remain a client of the authenticated HTTP API, not a debug route inside the
+server. Use it to seed end-to-end hook states before exercising iPhone and Watch
+UI:
+
+```sh
+cd server
+npm run debug -- seed --scenario approval-shell
+npm run debug -- seed --scenario waiting-input
+```
+
+The seeded environment should be enough to verify relay event folding,
+WatchConnectivity snapshot delivery, hook-only action buttons, and downlink
+request acknowledgement without installing real CLI hooks.
+
 ## WatchConnectivity Tests
 
 Coverage:
@@ -119,6 +134,13 @@ Coverage:
 - [ ] Primary state is understandable within 2 seconds.
 - [ ] Offline state is visible and actions are disabled when needed.
 - [ ] Approval action can be completed from the watch.
+- [ ] During an approval hook, Status and Commands show only `Approve` and
+      `Deny`; turning the wrist switches the highlighted option once per
+      deliberate turn.
+- [ ] During an input hook, `Reply` is highlighted and Apple Watch Double Tap
+      sends the quick reply action.
+- [ ] With no hook pending, Status and Commands show no interactive action
+      buttons and wrist motion does not change selection.
 - [ ] Expired approval action fails safely.
 
 ### Watch Buddy Art
@@ -164,6 +186,7 @@ Coverage:
 - [ ] Offline Mac requests expire or queue according to policy.
 - [ ] Duplicate requests are deduplicated.
 - [ ] Delivery acknowledgement updates request status.
+- [ ] Request completion records a result or error separate from delivery acknowledgement.
 - [ ] Rate limits return machine-readable errors.
 
 ## Verification Commands
@@ -184,7 +207,9 @@ Current workspace commands:
 ```bash
 cd apps/apple && swift test
 cd server && npm test
+cd server && npm run typecheck
 cd plugins && npm test
+cd plugins && npm run typecheck
 ```
 
 ## Release Quality Bar
