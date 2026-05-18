@@ -21,6 +21,8 @@ struct BuddyRootView: View {
         }
         .padding(24)
         .frame(width: 360, height: 280)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Kiri Buddy settings")
     }
 
     private var header: some View {
@@ -42,6 +44,9 @@ struct BuddyRootView: View {
 
     private var statusRow: some View {
         HStack(spacing: 12) {
+            Image(systemName: statusIcon)
+                .foregroundStyle(statusColor)
+                .font(.caption)
             Circle()
                 .fill(statusColor)
                 .frame(width: 10, height: 10)
@@ -49,6 +54,8 @@ struct BuddyRootView: View {
                 .font(.callout)
                 .foregroundStyle(.primary)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Status: \(statusText)")
     }
 
     private var displayStateBlock: some View {
@@ -79,6 +86,15 @@ struct BuddyRootView: View {
         case .starting: return .yellow
         case .running: return .green
         case .failed: return .red
+        }
+    }
+
+    private var statusIcon: String {
+        switch model.status {
+        case .stopped: return "stop.circle"
+        case .starting: return "arrow.clockwise.circle"
+        case .running: return "checkmark.circle"
+        case .failed: return "exclamationmark.triangle"
         }
     }
 }

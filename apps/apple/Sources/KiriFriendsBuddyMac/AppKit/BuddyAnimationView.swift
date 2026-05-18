@@ -27,6 +27,9 @@ public final class BuddyAnimationView: NSView {
 
         wantsLayer = true
         layer?.backgroundColor = NSColor.clear.cgColor
+        setAccessibilityElement(true)
+        setAccessibilityRole(.image)
+        updateAccessibilityLabel()
         webView.translatesAutoresizingMaskIntoConstraints = false
         webView.setValue(false, forKey: "drawsBackground")
         addSubview(webView)
@@ -67,7 +70,12 @@ public final class BuddyAnimationView: NSView {
     public func setState(_ state: MacBuddyState) {
         guard state != currentState else { return }
         currentState = state
+        updateAccessibilityLabel()
         emitCurrentState()
+    }
+
+    private func updateAccessibilityLabel() {
+        setAccessibilityLabel("Kiri Buddy is \(currentState.accessibilityDescription)")
     }
 
     private func loadDefaultTheme() async {

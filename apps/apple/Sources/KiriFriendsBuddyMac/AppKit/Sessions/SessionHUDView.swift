@@ -24,6 +24,7 @@ struct SessionHUDView: View {
                     Label("Pending", systemImage: "hand.raised.fill")
                         .font(.caption)
                         .foregroundStyle(.orange)
+                        .accessibilityLabel("Permission request pending")
                 }
             }
 
@@ -44,6 +45,8 @@ struct SessionHUDView: View {
                 .fill(.thinMaterial)
                 .shadow(radius: 12, y: 6)
         )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Session HUD: \(sessions.count) active session\(sessions.count == 1 ? "" : "s")")
     }
 }
 
@@ -52,6 +55,9 @@ private struct SessionRow: View {
 
     var body: some View {
         HStack(spacing: 10) {
+            Image(systemName: badgeIcon)
+                .font(.caption2)
+                .foregroundStyle(badgeColor)
             Circle()
                 .fill(badgeColor)
                 .frame(width: 8, height: 8)
@@ -70,6 +76,8 @@ private struct SessionRow: View {
                     .lineLimit(1)
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(session.key.agent.rawValue): \(session.state.accessibilityDescription)")
     }
 
     private var badgeColor: Color {
@@ -80,6 +88,17 @@ private struct SessionRow: View {
         case .thinking: return .purple
         case .idle: return .green
         case .sleeping, .yawning, .dozing, .collapsing, .waking: return .gray
+        }
+    }
+
+    private var badgeIcon: String {
+        switch session.state {
+        case .error: return "exclamationmark.circle"
+        case .notification, .attention: return "bell.fill"
+        case .working, .juggling, .carrying, .sweeping: return "figure.run"
+        case .thinking: return "brain.head.profile"
+        case .idle: return "checkmark.circle"
+        case .sleeping, .yawning, .dozing, .collapsing, .waking: return "moon.fill"
         }
     }
 }

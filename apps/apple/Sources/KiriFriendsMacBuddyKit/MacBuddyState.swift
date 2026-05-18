@@ -94,4 +94,24 @@ public extension MacBuddyState {
             return .failed
         }
     }
+
+    /// Human-readable description for VoiceOver / accessibility.
+    var accessibilityDescription: String {
+        switch self {
+        case .sleeping:  return "sleeping"
+        case .yawning:   return "getting sleepy"
+        case .dozing:    return "dozing"
+        case .collapsing: return "collapsing into sleep"
+        case .waking:    return "waking up"
+        case .idle:      return "idle"
+        case .thinking:  return "thinking"
+        case .working:   return "working"
+        case .juggling:  return "juggling multiple tasks"
+        case .carrying:  return "carrying a long-running task"
+        case .attention: return "seeking attention"
+        case .sweeping:  return "sweeping up"
+        case .notification: return "showing a notification"
+        case .error:     return "encountered an error"
+        }
+    }
 }

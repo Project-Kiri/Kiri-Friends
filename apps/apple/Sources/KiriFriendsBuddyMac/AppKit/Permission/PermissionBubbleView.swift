@@ -12,17 +12,8 @@ struct PermissionBubbleView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Image(systemName: "hand.tap.fill")
-                    .symbolRenderingMode(.hierarchical)
-                    .foregroundStyle(.orange)
-                Text("Approval needed")
-                    .font(.headline)
-                Spacer()
-                Text(request.agent.rawValue)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            header
+
             Text(request.payload.toolName)
                 .font(.callout.monospaced())
                 .foregroundStyle(.primary)
@@ -32,32 +23,9 @@ struct PermissionBubbleView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(3)
             }
-            HStack(spacing: 8) {
-                Button(role: .destructive) {
-                    onDecide(PermissionResponse(behavior: .deny))
-                } label: {
-                    Label("Deny", systemImage: "xmark.circle")
-                }
-                .buttonStyle(.bordered)
-                .keyboardShortcut("n", modifiers: [.control, .shift])
+            actionButtons
 
-                Spacer()
-
-                Button {
-                    onDecide(PermissionResponse(behavior: .ask, message: "Always"))
-                } label: {
-                    Label("Always", systemImage: "checkmark.shield")
-                }
-                .buttonStyle(.bordered)
-
-                Button {
-                    onDecide(PermissionResponse(behavior: .allow))
-                } label: {
-                    Label("Allow", systemImage: "checkmark.circle")
-                }
-                .buttonStyle(.borderedProminent)
-                .keyboardShortcut("y", modifiers: [.control, .shift])
-            }
+            shortcutHint
         }
         .padding(16)
         .frame(width: 360)
@@ -66,5 +34,65 @@ struct PermissionBubbleView: View {
                 .fill(.thickMaterial)
                 .shadow(radius: 18, y: 8)
         )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Permission request from \(request.agent.rawValue): \(request.payload.toolName)")
+    }
+
+    private var header: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "hand.tap.fill")
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(.orange)
+            Text("Approval needed")
+                .font(.headline)
+            Spacer()
+            Text(request.agent.rawValue)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var actionButtons: some View {
+        HStack(spacing: 8) {
+            Button(role: .destructive) {
+                onDecide(PermissionResponse(behavior: .deny))
+            } label: {
+                Label("Deny", systemImage: "xmark.circle")
+            }
+            .buttonStyle(.bordered)
+            .keyboardShortcut("n", modifiers: [.control, .shift])
+            .accessibilityHint("Deny this tool request. Shortcut: Control-Shift-N.")
+
+            Spacer()
+
+            Button {
+                onDecide(PermissionResponse(behavior: .ask, message: "Always"))
+            } label: {
+                Label("Always", systemImage: "checkmark.shield")
+            }
+            .buttonStyle(.bordered)
+            .accessibilityHint("Allow this tool and remember the choice.")
+
+            Button {
+                onDecide(PermissionResponse(behavior: .allow))
+            } label: {
+                Label("Allow", systemImage: "checkmark.circle")
+            }
+            .buttonStyle(.borderedProminent)
+            .keyboardShortcut("y", modifiers: [.control, .shift])
+            .accessibilityHint("Allow this tool request. Shortcut: Control-Shift-Y.")
+        }
+    }
+
+    private var shortcutHint: some View {
+        HStack(spacing: 4) {
+            Spacer()
+            Image(systemName: "keyboard")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            Text("Control-Shift-Y to Allow · Control-Shift-N to Deny")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
     }
 }
