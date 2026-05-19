@@ -39,6 +39,17 @@ sheet, Sessions tab, and complications; it is not rendered as pet speech. The
 Status page hides the speech row unless a future snapshot field carries explicit
 buddy utterance text.
 
+A microphone button below the buddy art sends a `voice.inputRequest` watch action
+to the iPhone companion. The iPhone uses `SFSpeechRecognizer` to capture speech
+from its own microphone, then automatically forwards the transcribed text as a
+`prompt.sendQuick` action. This bypasses the watchOS limitation that
+`SFSpeechRecognizer` is not available on Apple Watch.
+
+When transcription completes, the iPhone echoes the recognized text back to the
+watch via a `voice.transcription` `sendMessage` payload. The watch displays this
+as a `TranscriptionBadge` below the speech bubble so the user sees what was
+understood before it is sent to the CLI host.
+
 The buddy animation path mirrors `clawd-on-desk` rather than applying a generic
 scale loop to a single image. `BundledBuddyTheme.animationSpec` carries the
 desktop theme semantics (`states`, `workingTiers`, `idleAnimations`,
@@ -51,14 +62,19 @@ fallback only when a frame manifest is unavailable.
 ```swift
 struct BuddyHomeView: View {
     let snapshot: StateSnapshot
+    let voiceTranscription: String?
 
     var body: some View {
-        VStack {
+        VStack(spacing: 6) {
             BuddyStageView(
                 snapshot: snapshot,
                 presentation: BuddyPresentationReducer.presentation(for: snapshot)
             )
             BuddySpeechBubble(line: presentation.speech)
+            if let transcription = voiceTranscription, !transcription.isEmpty {
+                TranscriptionBadge(text: transcription)
+            }
+            ConnectionBadgeView(connectionState: snapshot.connectionState)
         }
     }
 }
@@ -94,9 +110,10 @@ as `waitingForInput` quick replies. Approval actions are intentionally excluded
 from Commands so the Watch never shows a second `Approve` / `Deny` page for the
 same request.
 
-The Settings tab can send a low-sensitivity `health.signal.summary` through
-WatchConnectivity. The iPhone only folds this into `StateSnapshot` when the
-user enables health context sharing in the iPhone privacy settings.
+The Watch app sends a low-sensitivity `health.signal.summary` through
+WatchConnectivity automatically on a five-minute heartbeat while the app is
+active. The iPhone only folds this into `StateSnapshot` when the user enables
+health context sharing in the iPhone privacy settings.
 
 The Watch app is an iPhone companion app, not a standalone watch-only runtime.
 Its bundle identifier must stay under the iPhone prefix

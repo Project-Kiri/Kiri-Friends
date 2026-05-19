@@ -193,6 +193,15 @@ Stop the current running task for a specific session.
 }
 ```
 
+### `voice.inputRequest` (Watch-originated)
+
+Initiates speech recognition on the iPhone companion. The iPhone uses
+`SFSpeechRecognizer` to transcribe speech from its own microphone, then
+automatically forwards the result as a `prompt.sendQuick` action. This action
+is never sent to the Cloud Relay; it is handled entirely within the iPhone
+companion. After transcription, the iPhone echoes the recognized text back to
+the watch via `voice.transcription` so the user can confirm what was understood.
+
 ### `approval.allow` / `approval.deny`
 
 Approve or deny a CLI permission request.

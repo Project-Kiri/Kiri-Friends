@@ -252,6 +252,7 @@ public enum WatchActionKind: String, Codable, Hashable, Sendable {
     case approvalAllow = "approval.allow"
     case approvalDeny = "approval.deny"
     case promptSendQuick = "prompt.sendQuick"
+    case voiceInputRequest = "voice.inputRequest"
 }
 
 public struct BuddySettings: Codable, Hashable, Sendable {
@@ -282,6 +283,7 @@ public struct WatchAction: Codable, Hashable, Sendable {
     public var action: WatchActionKind
     public var sessionId: String?
     public var approvalId: String?
+    public var text: String?
     public var createdAt: Date
 
     public init(
@@ -290,6 +292,7 @@ public struct WatchAction: Codable, Hashable, Sendable {
         action: WatchActionKind,
         sessionId: String?,
         approvalId: String?,
+        text: String? = nil,
         createdAt: Date
     ) {
         self.schemaVersion = schemaVersion
@@ -297,6 +300,7 @@ public struct WatchAction: Codable, Hashable, Sendable {
         self.action = action
         self.sessionId = sessionId
         self.approvalId = approvalId
+        self.text = text
         self.createdAt = createdAt
     }
 }

@@ -5,6 +5,7 @@ public enum WatchPayloadKind: String, Codable, Hashable, Sendable {
     case watchAction = "watch.action"
     case buddySettings = "buddy.settings"
     case healthSignalSummary = "health.signal.summary"
+    case voiceTranscription = "voice.transcription"
 }
 
 public enum WatchConnectivityPayload {

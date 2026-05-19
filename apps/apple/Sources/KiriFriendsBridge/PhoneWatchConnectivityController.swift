@@ -35,6 +35,17 @@ public final class PhoneWatchConnectivityController: NSObject {
         try mergeAndFlush(kind: .buddySettings, value: settings)
     }
 
+    public func sendMessage(_ dictionary: [String: Any]) {
+        guard session.activationState == .activated, session.isReachable else { return }
+        session.sendMessage(dictionary, replyHandler: nil) { _ in }
+    }
+
+    public func sendVoiceTranscription(_ text: String) {
+        guard session.activationState == .activated, session.isReachable else { return }
+        var payload: [String: Any] = ["kind": WatchPayloadKind.voiceTranscription.rawValue, "text": text]
+        session.sendMessage(payload, replyHandler: nil) { _ in }
+    }
+
     @discardableResult
     public func transferBuddyAsset(fileURL: URL, manifest: BuddyAssetManifest) throws -> WCSessionFileTransfer {
         let metadata = try WatchConnectivityPayload.dictionary(from: manifest)

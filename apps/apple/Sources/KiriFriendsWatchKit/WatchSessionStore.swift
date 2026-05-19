@@ -4,12 +4,20 @@ import Observation
 
 #if canImport(WatchConnectivity)
 import WatchConnectivity
+#endif
+
+#if canImport(HealthKit)
+import HealthKit
+#endif
+
+#if canImport(WatchConnectivity)
 
 @Observable
-public final class WatchSessionStore: NSObject {
+public final class WatchSessionStore: NSObject, @unchecked Sendable {
     public private(set) var snapshot: StateSnapshot
     public private(set) var buddySettings: BuddySettings?
     public private(set) var lastErrorDescription: String?
+    public private(set) var lastVoiceTranscription: String?
 
     private let session: WCSession
     private let cache: WatchStateCache
@@ -29,6 +37,11 @@ public final class WatchSessionStore: NSObject {
         session.delegate = self
         session.activate()
     }
+
+    #if canImport(HealthKit)
+    private let healthProvider = HealthSignalProvider()
+    private var heartbeatTask: Task<Void, Never>?
+    #endif
 
     public func sendAction(_ action: WatchAction) {
         applyOptimisticDecision(for: action)
@@ -66,6 +79,10 @@ public final class WatchSessionStore: NSObject {
         case .buddySettings:
             if let settings = try? WatchConnectivityPayload.decode(BuddySettings.self, from: payload) {
                 buddySettings = settings
+            }
+        case .voiceTranscription:
+            if let text = payload["text"] as? String {
+                lastVoiceTranscription = text
             }
         case .watchAction, .healthSignalSummary:
             // Phone-bound payloads should not appear on the watch; ignore.
@@ -123,7 +140,43 @@ extension WatchSessionStore: WCSessionDelegate {
     ) {
         lastErrorDescription = error?.localizedDescription
         ingest(applicationContext: session.receivedApplicationContext)
+
+        #if canImport(HealthKit)
+        if activationState == .activated {
+            startHeartbeat()
+        }
+        #endif
     }
+
+    #if canImport(HealthKit)
+    private func startHeartbeat() {
+        heartbeatTask?.cancel()
+        heartbeatTask = Task { [weak self] in
+            await self?.performHealthHeartbeat()
+
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(300))
+                guard !Task.isCancelled else { break }
+                await self?.performHealthHeartbeat()
+            }
+        }
+    }
+
+    private func stopHeartbeat() {
+        heartbeatTask?.cancel()
+        heartbeatTask = nil
+    }
+
+    private func performHealthHeartbeat() async {
+        do {
+            try await healthProvider.requestAuthorization()
+            let summary = await healthProvider.currentSummary()
+            sendHealthSummary(summary)
+        } catch {
+            // Health data unavailable; silently ignore on heartbeat.
+        }
+    }
+    #endif
 
     public func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
         ingest(applicationContext: applicationContext)
@@ -131,6 +184,12 @@ extension WatchSessionStore: WCSessionDelegate {
 
     public func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any]) {
         ingest(applicationContext: userInfo)
+    }
+
+    public func session(_ session: WCSession, didReceiveMessage message: [String: Any]) {
+        for entry in WatchConnectivityEnvelope.unpack(message) {
+            handle(kind: entry.kind, payload: entry.payload)
+        }
     }
 
     #if os(iOS)
@@ -146,6 +205,7 @@ public final class WatchSessionStore {
     public private(set) var snapshot: StateSnapshot
     public private(set) var buddySettings: BuddySettings?
     public private(set) var lastErrorDescription: String?
+    public private(set) var lastVoiceTranscription: String?
 
     private let cache: WatchStateCache
 
@@ -171,6 +231,10 @@ public final class WatchSessionStore {
             case .buddySettings:
                 if let settings = try? WatchConnectivityPayload.decode(BuddySettings.self, from: entry.payload) {
                     buddySettings = settings
+                }
+            case .voiceTranscription:
+                if let text = entry.payload["text"] as? String {
+                    lastVoiceTranscription = text
                 }
             case .watchAction, .healthSignalSummary:
                 break

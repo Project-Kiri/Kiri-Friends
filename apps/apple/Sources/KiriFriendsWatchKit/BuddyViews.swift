@@ -1,19 +1,29 @@
 import KiriFriendsCore
 import SwiftUI
 
+#if canImport(WatchKit)
+import WatchKit
+#endif
+
 public struct BuddyHomeView: View {
     private let snapshot: StateSnapshot
     private let theme: BundledBuddyTheme
+    private let voiceTranscription: String?
+    private let onVoiceTap: (() -> Void)?
 
     @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
         snapshot: StateSnapshot,
-        theme: BundledBuddyTheme = BundledBuddyThemeRegistry.defaultTheme
+        theme: BundledBuddyTheme = BundledBuddyThemeRegistry.defaultTheme,
+        voiceTranscription: String? = nil,
+        onVoiceTap: (() -> Void)? = nil
     ) {
         self.snapshot = snapshot
         self.theme = theme
+        self.voiceTranscription = voiceTranscription
+        self.onVoiceTap = onVoiceTap
     }
 
     public var body: some View {
@@ -34,9 +44,13 @@ public struct BuddyHomeView: View {
                 theme: theme,
                 reduceMotion: reduceMotion,
                 isLuminanceReduced: isLuminanceReduced,
-                stageSize: 132
+                stageSize: 132,
+                onVoiceTap: onVoiceTap
             )
             BuddySpeechBubble(line: presentation.speech, redactsText: isLuminanceReduced)
+            if let transcription = voiceTranscription, !transcription.isEmpty {
+                TranscriptionBadge(text: transcription)
+            }
             ConnectionBadgeView(connectionState: snapshot.connectionState)
             Spacer(minLength: 0)
         }
@@ -54,6 +68,24 @@ public struct BuddyHomeView: View {
     }
 }
 
+private struct VoiceInputButton: View {
+    let onVoiceTap: (() -> Void)?
+
+    var body: some View {
+        Button {
+            onVoiceTap?()
+        } label: {
+            Image(systemName: "mic.fill")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+                .frame(width: 28, height: 28)
+                .background(Circle().fill(.gray.opacity(0.25)))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Voice input")
+    }
+}
+
 public struct BuddyStageView: View {
     let snapshot: StateSnapshot
     let presentation: BuddyPresentation
@@ -61,6 +93,7 @@ public struct BuddyStageView: View {
     let reduceMotion: Bool
     let isLuminanceReduced: Bool
     let stageSize: CGFloat
+    let onVoiceTap: (() -> Void)?
 
     public init(
         snapshot: StateSnapshot,
@@ -68,7 +101,8 @@ public struct BuddyStageView: View {
         theme: BundledBuddyTheme = BundledBuddyThemeRegistry.defaultTheme,
         reduceMotion: Bool = false,
         isLuminanceReduced: Bool = false,
-        stageSize: CGFloat = 104
+        stageSize: CGFloat = 104,
+        onVoiceTap: (() -> Void)? = nil
     ) {
         self.snapshot = snapshot
         self.presentation = presentation
@@ -76,6 +110,7 @@ public struct BuddyStageView: View {
         self.reduceMotion = reduceMotion
         self.isLuminanceReduced = isLuminanceReduced
         self.stageSize = stageSize
+        self.onVoiceTap = onVoiceTap
     }
 
     public var body: some View {
@@ -83,20 +118,25 @@ public struct BuddyStageView: View {
         // we deliberately omit the raw "Attention/Running/..." caption per
         // watchos-design-guidelines W-GL-04 and the project copy rule about
         // redundant text. VoiceOver still announces the state.
-        BuddyAnimationPlayer(
-            request: BuddyAnimationResolver.request(
-                for: snapshot,
-                presentation: presentation,
-                theme: theme,
-                isLuminanceReduced: isLuminanceReduced
-            ),
-            fallbackAssetName: BuddyStageAssetResolver.assetName(for: presentation.state, in: theme),
-            fallbackSymbolName: BuddyStageAssetResolver.symbolFallback(for: presentation.state),
-            reduceMotion: reduceMotion,
-            stageSize: stageSize
-        )
-            .accessibilityElement()
-            .accessibilityLabel("Kiri is \(presentation.state.rawValue)")
+        ZStack(alignment: .bottom) {
+            BuddyAnimationPlayer(
+                request: BuddyAnimationResolver.request(
+                    for: snapshot,
+                    presentation: presentation,
+                    theme: theme,
+                    isLuminanceReduced: isLuminanceReduced
+                ),
+                fallbackAssetName: BuddyStageAssetResolver.assetName(for: presentation.state, in: theme),
+                fallbackSymbolName: BuddyStageAssetResolver.symbolFallback(for: presentation.state),
+                reduceMotion: reduceMotion,
+                stageSize: stageSize
+            )
+                .accessibilityElement()
+                .accessibilityLabel("Kiri is \(presentation.state.rawValue)")
+
+            VoiceInputButton(onVoiceTap: onVoiceTap)
+                .offset(y: 14)
+        }
     }
 }
 
@@ -151,6 +191,25 @@ public struct BuddySpeechBubble: View {
                 .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
                 .privacySensitive(line.sensitivity != .none)
         }
+    }
+}
+
+private struct TranscriptionBadge: View {
+    let text: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "waveform")
+                .font(.caption2)
+            Text(text)
+                .font(.caption2)
+                .lineLimit(2)
+        }
+        .foregroundStyle(.secondary)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 8))
     }
 }
 

@@ -31,7 +31,9 @@ struct ContentView: View {
         TabView {
             StatusView(
                 snapshot: watchStore.snapshot,
-                theme: activeTheme
+                theme: activeTheme,
+                voiceTranscription: watchStore.lastVoiceTranscription,
+                sendAction: watchStore.sendAction
             )
             .tabItem { Label("Status", systemImage: "waveform") }
 
@@ -53,8 +55,7 @@ struct ContentView: View {
 
             SettingsView(
                 snapshot: watchStore.snapshot,
-                buddySettings: watchStore.buddySettings,
-                sendHealthSummary: watchStore.sendHealthSummary
+                buddySettings: watchStore.buddySettings
             )
                 .tabItem { Label("Settings", systemImage: "gear") }
         }
@@ -110,7 +111,7 @@ struct ContentView: View {
             KiriHaptics.approvalAccepted()
         case .approvalDeny:
             KiriHaptics.approvalDenied()
-        case .taskStop, .promptSendQuick, .statusRefresh:
+        case .taskStop, .promptSendQuick, .statusRefresh, .voiceInputRequest:
             KiriHaptics.selectionChanged()
         }
 
@@ -260,6 +261,8 @@ private struct ApprovalPromptCard: View {
 struct StatusView: View {
     let snapshot: StateSnapshot
     let theme: BundledBuddyTheme
+    let voiceTranscription: String?
+    let sendAction: (WatchAction) -> Void
 
     var body: some View {
         // Status is intentionally just the buddy stage. The agent label,
@@ -267,7 +270,22 @@ struct StatusView: View {
         // hint were removed so the primary action fits the first screen
         // (watchos-design-guidelines W-GL-01 / W-NV-05). Per-agent context
         // and additional sessions live one swipe away on the Sessions tab.
-        BuddyHomeView(snapshot: snapshot, theme: theme)
+        BuddyHomeView(
+            snapshot: snapshot,
+            theme: theme,
+            voiceTranscription: voiceTranscription,
+            onVoiceTap: {
+                let targetSession = snapshot.session ?? snapshot.sessions.first
+                sendAction(
+                    WatchAction(
+                        action: .voiceInputRequest,
+                        sessionId: targetSession?.id,
+                        approvalId: snapshot.approval?.id,
+                        createdAt: .now
+                    )
+                )
+            }
+        )
     }
 }
 
@@ -435,9 +453,6 @@ struct CommandsView: View {
 struct SettingsView: View {
     let snapshot: StateSnapshot
     let buddySettings: BuddySettings?
-    let sendHealthSummary: (HealthSignalSummary) -> Void
-
-    @State private var healthStatus: String?
 
     private var activeThemeName: String {
         BundledBuddyThemeRegistry
@@ -456,31 +471,6 @@ struct SettingsView: View {
                 LabeledContent("Buddy", value: buddySettings.buddyName)
                 LabeledContent("Preview", value: buddySettings.showsPreviewText ? "on" : "off")
             }
-            Button("Send Health Summary") {
-                Task { await sendCurrentHealthSummary() }
-            }
-            if let healthStatus {
-                Text(healthStatus)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
         }
-    }
-
-    private func sendCurrentHealthSummary() async {
-        #if canImport(HealthKit)
-        let provider = HealthSignalProvider()
-        do {
-            try await provider.requestAuthorization()
-            let summary = await provider.currentSummary()
-            sendHealthSummary(summary)
-            healthStatus = "Health summary sent"
-        } catch {
-            healthStatus = "Health data unavailable"
-        }
-        #else
-        sendHealthSummary(.placeholder)
-        healthStatus = "Health summary sent"
-        #endif
     }
 }

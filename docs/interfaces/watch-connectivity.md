@@ -51,6 +51,10 @@ envelope: each payload sits inside a slot keyed by its
 iPhone companion merges instead of replacing so different kinds do not
 overwrite each other.
 
+Additional envelope kinds:
+
+- `voice.transcription` — iPhone-to-watch echo of ASR results (delivered via `sendMessage`, not application context).
+
 ```json
 {
   "state.snapshot": {
@@ -117,6 +121,7 @@ Supported actions:
 - `approval.allow`
 - `approval.deny`
 - `prompt.sendQuick`
+- `voice.inputRequest`
 
 Example payload:
 
@@ -132,6 +137,15 @@ Example payload:
 ```
 
 The iPhone companion translates this into a CLIBridge request through the Cloud Relay.
+
+The `voice.inputRequest` action is handled locally on the iPhone: it starts `SFSpeechRecognizer`
+to capture speech from the iPhone microphone, then automatically forwards the transcribed text
+as a `prompt.sendQuick` action with the `text` field populated. This allows the watch to initiate
+voice input even though `SFSpeechRecognizer` is not available on watchOS.
+
+After forwarding the `prompt.sendQuick` action to the relay, the iPhone also sends a
+`voice.transcription` payload back to the watch via `sendMessage` so the user can see what
+was recognized before the CLI host processes it.
 
 ## Queued Updates
 
@@ -208,3 +222,4 @@ Health summaries sent beyond the iPhone must be derived labels such as `focused`
 - [ ] Complication data does not include private text.
 - [ ] Relay unavailable state is visible on watch.
 - [ ] Mac offline state disables unsafe actions.
+- [ ] Voice input (`voice.inputRequest`) triggers iPhone ASR and echoes `voice.transcription` back to watch.

@@ -19,7 +19,7 @@
 ## Milestone 3: Connected
 
 - [ ] Multi-CLI support (Claude Code, OpenCode, Codex)
-- [ ] Voice input for quick commands
+- [x] Voice input for quick commands
 - [ ] Siri Shortcuts integration
 - [ ] Widgets on iPhone companion
 
